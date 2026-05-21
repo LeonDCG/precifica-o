@@ -49,12 +49,12 @@ class Recipe {
     return Recipe(
       id: map['id'],
       name: map['name'],
-      yieldAmount: map['yieldAmount'],
+      yieldAmount: (map['yieldAmount'] as num).toDouble(),
       yieldUnit: map['yieldUnit'],
-      additionalCostPercent: map['additionalCostPercent'],
+      additionalCostPercent: (map['additionalCostPercent'] as num).toDouble(),
       instructions: map['instructions'] ?? '',
       prepTimeMinutes: map['prepTimeMinutes'] ?? 0,
-      laborCost: map['laborCost'] ?? 0.0,
+      laborCost: (map['laborCost'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
@@ -96,8 +96,8 @@ class RecipeIngredient {
       id: map['id'],
       recipeId: map['recipeId'],
       ingredientId: map['ingredientId'],
-      quantityUsed: map['quantityUsed'],
-      cost: map['cost'],
+      quantityUsed: (map['quantityUsed'] as num).toDouble(),
+      cost: (map['cost'] as num).toDouble(),
       ingredientType: map['ingredientType'] ?? 'ingredient',
     );
   }

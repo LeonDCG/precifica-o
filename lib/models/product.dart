@@ -65,14 +65,14 @@ class Product {
     return Product(
       id: map['id'],
       name: map['name'],
-      suggestedPrice: map['suggestedPrice'],
-      sellPrice: map['sellPrice'],
-      profitMarginPercent: map['profitMarginPercent'],
+      suggestedPrice: (map['suggestedPrice'] as num).toDouble(),
+      sellPrice: (map['sellPrice'] as num).toDouble(),
+      profitMarginPercent: (map['profitMarginPercent'] as num).toDouble(),
       imagePath: map['imagePath'] ?? '',
       isFeatured: (map['isFeatured'] ?? 0) == 1,
       category: map['category'] ?? 'Geral',
       unit: map['unit'] ?? 'unidade',
-      yieldAmount: map['yieldAmount']?.toDouble() ?? 1.0,
+      yieldAmount: (map['yieldAmount'] as num?)?.toDouble() ?? 1.0,
     );
   }
 }
@@ -109,8 +109,8 @@ class ProductRecipe {
       id: map['id'],
       productId: map['productId'],
       recipeId: map['recipeId'],
-      quantityUsed: map['quantityUsed'],
-      cost: map['cost'],
+      quantityUsed: (map['quantityUsed'] as num).toDouble(),
+      cost: (map['cost'] as num).toDouble(),
     );
   }
 }
@@ -142,7 +142,7 @@ class ProductExpense {
       id: map['id'],
       productId: map['productId'],
       name: map['name'],
-      cost: map['cost'],
+      cost: (map['cost'] as num).toDouble(),
     );
   }
 }

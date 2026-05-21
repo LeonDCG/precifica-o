@@ -45,12 +45,12 @@ class Ingredient {
       id: map['id'],
       name: map['name'],
       unit: map['unit'],
-      price: map['price'],
-      quantity: map['quantity'],
-      minStock: map['minStock']?.toDouble() ?? 0.0,
+      price: (map['price'] as num).toDouble(),
+      quantity: (map['quantity'] as num).toDouble(),
+      minStock: (map['minStock'] as num?)?.toDouble() ?? 0.0,
       type: map['type'] ?? 'ingredient',
       category: map['category'] ?? '',
-      stock: map['stock'] ?? 0.0,
+      stock: (map['stock'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
