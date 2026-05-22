@@ -28,6 +28,14 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.recipe != null) {
+      _name = widget.recipe!.name;
+      _yieldAmount = widget.recipe!.yieldAmount;
+      _yieldUnit = widget.recipe!.yieldUnit;
+      _instructions = widget.recipe!.instructions;
+      _prepTimeMinutes = widget.recipe!.prepTimeMinutes;
+      _selectedIngredients.addAll(widget.recipe!.ingredients);
+    }
     _loadIngredients();
   }
 
@@ -43,15 +51,6 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     setState(() {
       _availableIngredients = ingredients;
       _hourlyRate = rate;
-      
-      if (widget.recipe != null) {
-        _name = widget.recipe!.name;
-        _yieldAmount = widget.recipe!.yieldAmount;
-        _yieldUnit = widget.recipe!.yieldUnit;
-        _instructions = widget.recipe!.instructions;
-        _prepTimeMinutes = widget.recipe!.prepTimeMinutes;
-        _selectedIngredients.addAll(widget.recipe!.ingredients);
-      }
     });
   }
 
@@ -186,7 +185,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
             Row(
               children: [
                 IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
-                Text('Nova Receita', style: Theme.of(context).textTheme.headlineSmall),
+                Text(widget.recipe == null ? 'Nova Receita' : 'Editar Receita', style: Theme.of(context).textTheme.headlineSmall),
               ],
             ),
             const SizedBox(height: 16),

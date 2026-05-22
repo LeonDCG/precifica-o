@@ -56,11 +56,20 @@ class DatabaseHelper {
     final recipesResponse = await _client.from('recipes').select().order('name', ascending: true);
     List<Recipe> recipes = recipesResponse.map<Recipe>((json) => Recipe.fromMap(json)).toList();
     
-    // Buscar ingredientes para todas as receitas de uma vez ou loop
-    // Para simplificar, loop:
+    final allIngredients = await readAllIngredients();
+
     for (var recipe in recipes) {
       final riMaps = await _client.from('recipe_ingredients').select().eq('recipeId', recipe.id!);
-      recipe.ingredients = riMaps.map<RecipeIngredient>((json) => RecipeIngredient.fromMap(json)).toList();
+      recipe.ingredients = riMaps.map<RecipeIngredient>((json) {
+        final ri = RecipeIngredient.fromMap(json);
+        try {
+          final ing = allIngredients.firstWhere((i) => i.id == ri.ingredientId);
+          ri.ingredientName = ing.name;
+          ri.ingredientUnit = ing.unit;
+          ri.ingredientType = ing.type;
+        } catch (_) {}
+        return ri;
+      }).toList();
     }
     return recipes;
   }
@@ -98,9 +107,18 @@ class DatabaseHelper {
     final productsResponse = await _client.from('products').select().order('name', ascending: true);
     List<Product> products = productsResponse.map<Product>((json) => Product.fromMap(json)).toList();
     
+    final allRecipes = await readAllRecipes();
+
     for (var product in products) {
       final prMaps = await _client.from('product_recipes').select().eq('productId', product.id!);
-      product.recipes = prMaps.map<ProductRecipe>((json) => ProductRecipe.fromMap(json)).toList();
+      product.recipes = prMaps.map<ProductRecipe>((json) {
+        final pr = ProductRecipe.fromMap(json);
+        try {
+          final rec = allRecipes.firstWhere((r) => r.id == pr.recipeId);
+          pr.recipeName = rec.name;
+        } catch (_) {}
+        return pr;
+      }).toList();
       
       final peMaps = await _client.from('product_expenses').select().eq('productId', product.id!);
       product.extraExpenses = peMaps.map<ProductExpense>((json) => ProductExpense.fromMap(json)).toList();
