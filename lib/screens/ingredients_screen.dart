@@ -13,6 +13,7 @@ class IngredientsScreen extends StatefulWidget {
 class _IngredientsScreenState extends State<IngredientsScreen> {
   List<Ingredient> _allIngredients = [];
   String _selectedTab = 'ingredient'; // ingredient, packaging, operational
+  String _searchQuery = '';
   bool _isLoading = true;
 
   @override
@@ -117,8 +118,14 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filtrar a lista pela aba selecionada
-    final displayedList = _allIngredients.where((i) => i.type == _selectedTab).toList();
+    // Filtrar a lista pela aba selecionada e pela busca
+    final displayedList = _allIngredients.where((i) {
+      final matchesTab = i.type == _selectedTab;
+      final matchesSearch = _searchQuery.isEmpty || 
+          i.name.toLowerCase().contains(_searchQuery.toLowerCase()) || 
+          i.category.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesTab && matchesSearch;
+    }).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -162,6 +169,11 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: TextField(
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       hintText: 'Buscar...',
