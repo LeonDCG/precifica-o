@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/ingredient.dart';
 import '../models/recipe.dart';
 import '../database/db_helper.dart';
+import '../utils/unit_converter.dart';
 
 class AddRecipeScreen extends StatefulWidget {
   final Recipe? recipe;
@@ -57,6 +58,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
   void _showAddIngredientDialog(String type) {
     Ingredient? selectedIngredient;
     double qty = 0;
+    String usedUnit = '';
 
     final filteredList = _availableIngredients.where((i) => i.type == type).toList();
 
@@ -67,6 +69,16 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
+            List<String> units = selectedIngredient != null 
+                ? _getCompatibleUnits(selectedIngredient!.unit) 
+                : [];
+            if (usedUnit.isEmpty && selectedIngredient != null) {
+               usedUnit = selectedIngredient!.unit;
+            }
+            if (selectedIngredient != null && !units.contains(usedUnit)) {
+               usedUnit = units.first;
+            }
+
             return AlertDialog(
               title: Text(title, style: GoogleFonts.merriweather(fontWeight: FontWeight.bold)),
               content: Column(
@@ -85,20 +97,42 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                     onChanged: (val) {
                       setStateDialog(() {
                         selectedIngredient = val;
+                        if (val != null) usedUnit = val.unit;
                       });
                     },
                   ),
                   const SizedBox(height: 16),
                   if (selectedIngredient != null)
-                    TextField(
-                      decoration: InputDecoration(
-                        labelText: 'Qtd usada (${selectedIngredient!.unit})',
-                        border: const OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                      onChanged: (val) {
-                        qty = double.tryParse(val.replaceAll(',', '.')) ?? 0;
-                      },
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            decoration: const InputDecoration(
+                              labelText: 'Qtd usada',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (val) {
+                              qty = double.tryParse(val.replaceAll(',', '.')) ?? 0;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 1,
+                          child: DropdownButtonFormField<String>(
+                            value: usedUnit,
+                            decoration: const InputDecoration(border: OutlineInputBorder()),
+                            items: units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setStateDialog(() { usedUnit = val; });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -110,16 +144,18 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                 ElevatedButton(
                   onPressed: () {
                     if (selectedIngredient != null && qty > 0) {
-                      final cost = selectedIngredient!.unitPrice * qty;
+                      final cost = UnitConverter.getCost(qty, usedUnit, selectedIngredient!.unitPrice, selectedIngredient!.unit);
+                      final quantityInBase = UnitConverter.getQuantityInBaseUnit(qty, usedUnit, selectedIngredient!.unit);
+                      
                       setState(() {
                         _selectedIngredients.add(
                           RecipeIngredient(
                             recipeId: 0,
                             ingredientId: selectedIngredient!.id!,
                             ingredientName: selectedIngredient!.name,
-                            ingredientUnit: selectedIngredient!.unit,
+                            ingredientUnit: selectedIngredient!.unit, // Always display in base unit in the list afterwards
                             ingredientType: selectedIngredient!.type,
-                            quantityUsed: qty,
+                            quantityUsed: quantityInBase,
                             cost: cost,
                           ),
                         );
@@ -135,6 +171,17 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
         );
       },
     );
+  }
+
+  List<String> _getCompatibleUnits(String baseUnit) {
+    String b = baseUnit.trim().toLowerCase();
+    if (b == 'kg' || b == 'g' || b == 'grama' || b == 'kilo' || b == 'quilo' || b == 'gramas') {
+      return ['kg', 'g'];
+    }
+    if (b == 'l' || b == 'ml' || b == 'litro' || b == 'litros' || b == 'mililitro' || b == 'mililitros') {
+      return ['L', 'ml'];
+    }
+    return [baseUnit];
   }
 
   void _saveRecipe() async {
