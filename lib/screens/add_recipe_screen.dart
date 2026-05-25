@@ -457,15 +457,32 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final ri = list[index];
-                return ListTile(
-                  title: Text(ri.ingredientName, style: const TextStyle(fontSize: 14)),
-                  subtitle: Text('${ri.quantityUsed} ${ri.ingredientUnit}', style: const TextStyle(fontSize: 12)),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                  child: Row(
                     children: [
-                      Text('R\$ ${ri.cost.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ri.ingredientName, 
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${ri.quantityUsed} ${ri.ingredientUnit}  •  R\$ ${ri.cost.toStringAsFixed(2)}', 
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 16, color: Colors.red),
+                        constraints: const BoxConstraints(),
+                        padding: const EdgeInsets.all(8),
+                        icon: const Icon(Icons.close, size: 18, color: Colors.red),
                         onPressed: () => setState(() => _selectedIngredients.remove(ri)),
                       )
                     ],
