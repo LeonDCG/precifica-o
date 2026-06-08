@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart'; // Import the new LoginScreen
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/db_helper.dart';
@@ -42,11 +43,14 @@ class PrecificacaoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Check if the user is already logged in
+    final session = Supabase.instance.client.auth.currentSession;
+    
     return MaterialApp(
       title: 'Doce & Ponto',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const HomeScreen(),
+      home: session != null ? const HomeScreen() : const LoginScreen(),
     );
   }
 }
