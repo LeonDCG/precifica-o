@@ -3,14 +3,10 @@ import '../models/ingredient.dart';
 import '../database/db_helper.dart';
 
 class AddIngredientSheet extends StatefulWidget {
+  final Ingredient? ingredient;
   final VoidCallback onSaved;
-  final Ingredient? ingredient; // Opcional para edição
 
-  const AddIngredientSheet({
-    Key? key,
-    required this.onSaved,
-    this.ingredient,
-  }) : super(key: key);
+  const AddIngredientSheet({Key? key, this.ingredient, required this.onSaved}) : super(key: key);
 
   @override
   State<AddIngredientSheet> createState() => _AddIngredientSheetState();
@@ -18,56 +14,45 @@ class AddIngredientSheet extends StatefulWidget {
 
 class _AddIngredientSheetState extends State<AddIngredientSheet> {
   final _formKey = GlobalKey<FormState>();
-  String _name = '';
-  String _unit = 'kg';
-  double _price = 0;
-  double _quantity = 1;
-  String _type = 'ingredient'; // ingredient, packaging, operational
-  String _category = 'SECOS';
-  double _stock = 0;
-
-  final List<String> _units = ['g', 'kg', 'ml', 'L', 'unidade'];
-  final List<String> _categories = ['SECOS', 'ADOÇANTES', 'LATICÍNIOS', 'DIVERSOS'];
+  String name = '';
+  String unit = 'unidade';
+  double price = 0.0;
+  double quantity = 1.0;
+  String type = 'ingredient';
+  String category = '';
 
   @override
   void initState() {
     super.initState();
     if (widget.ingredient != null) {
-      final ing = widget.ingredient!;
-      _name = ing.name;
-      _unit = ing.unit;
-      _price = ing.price;
-      _quantity = ing.quantity;
-      _type = ing.type;
-      _category = ing.category.isEmpty ? 'SECOS' : ing.category;
-      _stock = ing.stock;
+      name = widget.ingredient!.name;
+      unit = widget.ingredient!.unit;
+      price = widget.ingredient!.price;
+      quantity = widget.ingredient!.quantity;
+      type = widget.ingredient!.type;
+      category = widget.ingredient!.category;
     }
   }
 
   void _save() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      final newIngredient = Ingredient(
+      final ingredient = Ingredient(
         id: widget.ingredient?.id,
-        name: _name,
-        unit: _unit,
-        price: _price,
-        quantity: _quantity,
-        type: _type,
-        category: _category,
-        stock: _stock,
+        name: name,
+        unit: unit,
+        price: price,
+        quantity: quantity,
+        type: type,
+        category: category,
       );
-
-      if (widget.ingredient != null) {
-        await DatabaseHelper.instance.updateIngredient(newIngredient);
+      if (ingredient.id == null) {
+        await DatabaseHelper.instance.createIngredient(ingredient);
       } else {
-        await DatabaseHelper.instance.createIngredient(newIngredient);
+        await DatabaseHelper.instance.updateIngredient(ingredient);
       }
-
       widget.onSaved();
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      Navigator.pop(context);
     }
   }
 
@@ -76,101 +61,84 @@ class _AddIngredientSheetState extends State<AddIngredientSheet> {
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 16,
-        right: 16,
-        top: 24,
+        left: 24, right: 24, top: 24,
       ),
       child: Form(
         key: _formKey,
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            Text(
-              widget.ingredient != null ? 'Editar Insumo' : 'Novo Insumo',
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(labelText: 'Tipo de Insumo'),
-              value: _type,
-              items: const [
-                DropdownMenuItem(value: 'ingredient', child: Text('Ingrediente')),
-                DropdownMenuItem(value: 'packaging', child: Text('Embalagem')),
-                DropdownMenuItem(value: 'operational', child: Text('Custo Operacional')),
-              ],
-              onChanged: (val) => setState(() => _type = val!),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              initialValue: _name,
-              decoration: const InputDecoration(labelText: 'Nome da Descrição'),
-              validator: (value) => value == null || value.isEmpty ? 'Informe o nome' : null,
-              onSaved: (value) => _name = value!,
-            ),
-            if (_type == 'ingredient') ...[
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Categoria'),
-                value: _category,
-                items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (val) => setState(() => _category = val!),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                widget.ingredient == null ? 'Novo Insumo' : 'Editar Insumo',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                initialValue: name,
+                decoration: const InputDecoration(labelText: 'Nome do Insumo', border: OutlineInputBorder()),
+                validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+                onSaved: (v) => name = v!,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      initialValue: price > 0 ? price.toString() : '',
+                      decoration: const InputDecoration(labelText: 'Preço Pago (R\$)', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+                      onSaved: (v) => price = double.parse(v!.replaceAll(',', '.')),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      initialValue: quantity > 0 ? quantity.toString() : '',
+                      decoration: const InputDecoration(labelText: 'Quantidade da Embalagem', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+                      onSaved: (v) => quantity = double.parse(v!.replaceAll(',', '.')),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                initialValue: unit,
+                decoration: const InputDecoration(labelText: 'Unidade (ex: kg, g, L, ml, unidade)', border: OutlineInputBorder()),
+                validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+                onSaved: (v) => unit = v!,
+              ),
+
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: type,
+                decoration: const InputDecoration(labelText: 'Tipo', border: OutlineInputBorder()),
+                items: const [
+                  DropdownMenuItem(value: 'ingredient', child: Text('Ingrediente')),
+                  DropdownMenuItem(value: 'packaging', child: Text('Embalagem')),
+                  DropdownMenuItem(value: 'operational', child: Text('Custo Operacional')),
+                ],
+                onChanged: (v) => setState(() => type = v!),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                initialValue: category,
+                decoration: const InputDecoration(labelText: 'Categoria (Opcional)', border: OutlineInputBorder()),
+                onSaved: (v) => category = v ?? '',
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _save,
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                child: const Text('Salvar'),
+              ),
+              const SizedBox(height: 24),
             ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: TextFormField(
-                    initialValue: _quantity.toString(),
-                    decoration: const InputDecoration(labelText: 'Qtd na Embalagem'),
-                    keyboardType: TextInputType.number,
-                    onSaved: (value) => _quantity = double.tryParse(value!.replaceAll(',', '.')) ?? 1,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 1,
-                  child: DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'Unidade'),
-                    value: _unit,
-                    items: _units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                    onChanged: (val) => setState(() => _unit = val!),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    initialValue: widget.ingredient != null ? _price.toString() : null,
-                    decoration: const InputDecoration(labelText: 'Preço Pago (R\$)'),
-                    keyboardType: TextInputType.number,
-                    validator: (value) => value == null || value.isEmpty ? 'Obrigatório' : null,
-                    onSaved: (value) => _price = double.tryParse(value!.replaceAll(',', '.')) ?? 0,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    initialValue: _stock.toString(),
-                    decoration: const InputDecoration(labelText: 'Estoque Atual'),
-                    keyboardType: TextInputType.number,
-                    onSaved: (value) => _stock = double.tryParse(value!.replaceAll(',', '.')) ?? 0,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _save,
-              child: Text(widget.ingredient != null ? 'SALVAR ALTERAÇÕES' : 'SALVAR'),
-            ),
-            const SizedBox(height: 24),
-          ],
+          ),
         ),
       ),
     );
