@@ -240,19 +240,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                               ),
                                             ),
                                           ),
-                                          // Botão Registrar Venda (Baixa no Estoque)
-                                          Positioned(
-                                            top: 12, right: 100,
-                                            child: CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: Colors.white,
-                                              child: IconButton(
-                                                padding: EdgeInsets.zero,
-                                                icon: const Icon(Icons.shopping_bag, size: 16, color: Colors.brown),
-                                                onPressed: () => _showSellDialog(product),
-                                              ),
-                                            ),
-                                          ),
+
                                           // Título e Preço
                                           Positioned(
                                             bottom: 16, left: 16, right: 16,
@@ -319,67 +307,4 @@ class _CatalogScreenState extends State<CatalogScreen> {
     );
   }
 
-  void _showSellDialog(Product product) {
-    int quantitySold = 1;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Registrar Venda', style: TextStyle(fontWeight: FontWeight.bold)),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Quantas unidades de "${product.name}" você vendeu?'),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () {
-                          if (quantitySold > 1) setState(() => quantitySold--);
-                        },
-                      ),
-                      Text('$quantitySold', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline),
-                        onPressed: () => setState(() => quantitySold++),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text('Os ingredientes serão deduzidos do seu estoque automaticamente.', style: TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await DatabaseHelper.instance.registerProductSale(product, quantitySold);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Venda registrada! Estoque atualizado.'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text('Confirmar Venda'),
-                ),
-              ],
-            );
-          }
-        );
-      },
-    );
-  }
 }

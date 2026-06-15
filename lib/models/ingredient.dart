@@ -2,14 +2,12 @@ class Ingredient {
   int? id;
   String name;
   String unit; // ex: 'kg', 'g', 'L', 'ml', 'unidade'
-  double price;
-  double quantity; // quantidade na embalagem original
-  double minStock;
+  double price; // valor pago
+  double quantity; // quantidade comprada (embalagem)
   
   // Novos campos para o design premium
   String type; // 'ingredient', 'packaging', 'operational'
   String category; // ex: 'SECOS', 'ADOÇANTES'
-  double stock;
 
   Ingredient({
     this.id,
@@ -17,10 +15,8 @@ class Ingredient {
     required this.unit,
     required this.price,
     required this.quantity,
-    this.minStock = 0.0,
     this.type = 'ingredient',
     this.category = '',
-    this.stock = 0.0,
   });
 
   // Calculate price per unit (e.g. price per 1 gram)
@@ -33,10 +29,8 @@ class Ingredient {
       'unit': unit,
       'price': price,
       'quantity': quantity,
-      'minStock': minStock,
       'type': type,
       'category': category,
-      'stock': stock,
     };
   }
 
@@ -47,10 +41,8 @@ class Ingredient {
       unit: map['unit'],
       price: (map['price'] as num).toDouble(),
       quantity: (map['quantity'] as num).toDouble(),
-      minStock: (map['minStock'] as num?)?.toDouble() ?? 0.0,
       type: map['type'] ?? 'ingredient',
       category: map['category'] ?? '',
-      stock: (map['stock'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

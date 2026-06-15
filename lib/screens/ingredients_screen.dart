@@ -46,75 +46,7 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
     );
   }
 
-  void _showRestockDialog(Ingredient ingredient) {
-    final quantityController = TextEditingController();
-    final priceController = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Repor ${ingredient.name}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Estoque atual: ${ingredient.stock.toStringAsFixed(2)} ${ingredient.unit}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: quantityController,
-                decoration: InputDecoration(labelText: 'Qtd comprada (${ingredient.unit})'),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: priceController,
-                decoration: const InputDecoration(labelText: 'Valor total pago (R\$)'),
-                keyboardType: TextInputType.number,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('CANCELAR'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final addedQty = double.tryParse(quantityController.text.replaceAll(',', '.')) ?? 0.0;
-                final paidPrice = double.tryParse(priceController.text.replaceAll(',', '.')) ?? 0.0;
-                
-                if (addedQty > 0 && paidPrice > 0) {
-                  // Custo Médio Ponderado
-                  final currentStockValue = ingredient.stock * (ingredient.price / ingredient.quantity);
-                  final newTotalStock = ingredient.stock + addedQty;
-                  
-                  double newAverageUnitPrice = 0;
-                  if (newTotalStock > 0) {
-                     newAverageUnitPrice = (currentStockValue + paidPrice) / newTotalStock;
-                  }
-                  
-                  // Atualiza o 'price' (referente à 'quantity' cadastrada no banco)
-                  final newPriceForStandardQuantity = newAverageUnitPrice * ingredient.quantity;
-
-                  ingredient.stock = newTotalStock;
-                  ingredient.price = newPriceForStandardQuantity;
-
-                  await DatabaseHelper.instance.updateIngredient(ingredient);
-                  
-                  if (mounted) {
-                    Navigator.pop(context);
-                    _refreshIngredients();
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Estoque atualizado!')));
-                  }
-                }
-              },
-              child: const Text('SALVAR'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -239,16 +171,11 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
     IconData icon = Icons.eco;
     if (item.type == 'packaging') icon = Icons.inventory_2;
     if (item.type == 'operational') icon = Icons.bolt;
-    final bool isLowStock = item.stock <= item.minStock;
-
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: isLowStock 
-            ? BorderSide(color: Colors.red.withOpacity(0.5), width: 2) 
-            : BorderSide.none,
       ),
       child: InkWell(
         onTap: () => _showAddIngredientSheet(ingredient: item),
@@ -271,10 +198,7 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add_shopping_cart, size: 20, color: Colors.blue),
-                    onPressed: () => _showRestockDialog(item),
-                  ),
+
                   IconButton(
                     icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
                     onPressed: () async {
@@ -290,30 +214,8 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                     children: [
-                      Icon(Icons.inventory_2_outlined, size: 16, color: isLowStock ? Colors.red : Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Estoque: ${item.stock.toStringAsFixed(2)} ${item.unit}',
-                        style: TextStyle(
-                          color: isLowStock ? Colors.red : Colors.grey[800],
-                          fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                      if (isLowStock)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                            child: const Text('BAIXO', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                    ],
-                  ),
                   Text(
-                    'Custo: R\$ ${item.unitPrice.toStringAsFixed(2)}',
+                    'Custo: R\$ ${item.unitPrice.toStringAsFixed(2)} por ${item.unit}',
                     style: TextStyle(color: Colors.grey[800], fontWeight: FontWeight.w500),
                   ),
                 ],
@@ -342,8 +244,6 @@ class _AddIngredientSheetState extends State<AddIngredientSheet> {
   String unit = 'unidade';
   double price = 0.0;
   double quantity = 1.0;
-  double stock = 0.0;
-  double minStock = 0.0;
   String type = 'ingredient';
   String category = '';
 
@@ -355,8 +255,6 @@ class _AddIngredientSheetState extends State<AddIngredientSheet> {
       unit = widget.ingredient!.unit;
       price = widget.ingredient!.price;
       quantity = widget.ingredient!.quantity;
-      stock = widget.ingredient!.stock;
-      minStock = widget.ingredient!.minStock;
       type = widget.ingredient!.type;
       category = widget.ingredient!.category;
     }
@@ -371,8 +269,6 @@ class _AddIngredientSheetState extends State<AddIngredientSheet> {
         unit: unit,
         price: price,
         quantity: quantity,
-        stock: stock,
-        minStock: minStock,
         type: type,
         category: category,
       );
@@ -442,28 +338,7 @@ class _AddIngredientSheetState extends State<AddIngredientSheet> {
                 validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
                 onSaved: (v) => unit = v!,
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      initialValue: stock > 0 ? stock.toString() : '',
-                      decoration: const InputDecoration(labelText: 'Estoque Atual', border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                      onSaved: (v) => stock = double.tryParse(v!.replaceAll(',', '.')) ?? 0.0,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      initialValue: minStock > 0 ? minStock.toString() : '',
-                      decoration: const InputDecoration(labelText: 'Estoque Mínimo (Alerta)', border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                      onSaved: (v) => minStock = double.tryParse(v!.replaceAll(',', '.')) ?? 0.0,
-                    ),
-                  ),
-                ],
-              ),
+
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: type,

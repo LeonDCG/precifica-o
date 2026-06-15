@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
 import 'ingredients_screen.dart';
-import 'recipes_screen.dart';
 import 'catalog_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -17,7 +16,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _pages = [
     const DashboardScreen(),
     const IngredientsScreen(),
-    const RecipesScreen(),
     const CatalogScreen(),
   ];
 
@@ -43,11 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.inventory_2_outlined),
             activeIcon: Icon(Icons.inventory_2),
             label: 'Insumos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book_outlined),
-            activeIcon: Icon(Icons.menu_book),
-            label: 'Receitas',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag_outlined),
