@@ -94,9 +94,9 @@ class ProductIngredient {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'productId': productId,
-      'ingredientId': ingredientId,
-      'quantityUsed': quantityUsed,
+      'productid': productId,
+      'ingredientid': ingredientId,
+      'quantityused': quantityUsed,
       'cost': cost,
     };
   }
@@ -104,9 +104,9 @@ class ProductIngredient {
   factory ProductIngredient.fromMap(Map<String, dynamic> map) {
     return ProductIngredient(
       id: map['id'],
-      productId: map['productId'],
-      ingredientId: map['ingredientId'],
-      quantityUsed: (map['quantityUsed'] as num).toDouble(),
+      productId: map['productid'] ?? map['productId'],
+      ingredientId: map['ingredientid'] ?? map['ingredientId'],
+      quantityUsed: (map['quantityused'] ?? map['quantityUsed'] as num).toDouble(),
       cost: (map['cost'] as num).toDouble(),
     );
   }

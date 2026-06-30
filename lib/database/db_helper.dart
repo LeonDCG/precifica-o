@@ -58,7 +58,7 @@ class DatabaseHelper {
     final allIngredients = await readAllIngredients();
 
     for (var product in products) {
-      final piMaps = await _client.from('product_ingredients').select().eq('productId', product.id!);
+      final piMaps = await _client.from('product_ingredients').select().eq('productid', product.id!);
       product.ingredients = piMaps.map<ProductIngredient>((json) {
         final pi = ProductIngredient.fromMap(json);
         try {
@@ -73,7 +73,7 @@ class DatabaseHelper {
   }
 
   Future<int> deleteProduct(int id) async {
-    await _client.from('product_ingredients').delete().eq('productId', id);
+    await _client.from('product_ingredients').delete().eq('productid', id);
     await _client.from('products').delete().eq('id', id);
     return 1;
   }
@@ -84,7 +84,7 @@ class DatabaseHelper {
     await _client.from('products').update(prodData).eq('id', product.id!);
 
     // Recreate ingredients
-    await _client.from('product_ingredients').delete().eq('productId', product.id!);
+    await _client.from('product_ingredients').delete().eq('productid', product.id!);
     for (var pi in product.ingredients) {
       pi.productId = product.id!;
       var piData = pi.toMap();
