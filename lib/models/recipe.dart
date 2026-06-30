@@ -1,6 +1,7 @@
 class Recipe {
   int? id;
   String name;
+  String category; // Grupo/categoria da receita (ex: Massa, Recheio)
   double yieldAmount;
   String yieldUnit;
   double additionalCostPercent;
@@ -13,6 +14,7 @@ class Recipe {
   Recipe({
     this.id,
     required this.name,
+    this.category = 'Geral',
     this.yieldAmount = 1,
     this.yieldUnit = 'unidade',
     this.additionalCostPercent = 10.0,
@@ -36,6 +38,7 @@ class Recipe {
     return {
       'id': id,
       'name': name,
+      'category': category,
       'yieldamount': yieldAmount,
       'yieldunit': yieldUnit,
       'additionalcostpercent': additionalCostPercent,
@@ -49,6 +52,7 @@ class Recipe {
     return Recipe(
       id: map['id'],
       name: map['name'],
+      category: map['category'] ?? 'Geral',
       yieldAmount: (map['yieldamount'] ?? map['yieldAmount'] as num).toDouble(),
       yieldUnit: map['yieldunit'] ?? map['yieldUnit'] ?? 'unidade',
       additionalCostPercent: (map['additionalcostpercent'] ?? map['additionalCostPercent'] as num).toDouble(),

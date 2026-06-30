@@ -17,11 +17,13 @@ class AddRecipeScreen extends StatefulWidget {
 class _AddRecipeScreenState extends State<AddRecipeScreen> {
   final _formKey = GlobalKey<FormState>();
   String _name = '';
+  String _category = 'Geral';
   double _yieldAmount = 1;
   String _yieldUnit = 'Unidade';
   String _instructions = '';
   int _prepTimeMinutes = 0;
   double _hourlyRate = 0.0;
+  List<String> _existingCategories = ['Geral'];
 
   List<Ingredient> _availableIngredients = [];
   final List<RecipeIngredient> _selectedIngredients = [];
@@ -31,6 +33,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     super.initState();
     if (widget.recipe != null) {
       _name = widget.recipe!.name;
+      _category = widget.recipe!.category;
       _yieldAmount = widget.recipe!.yieldAmount;
       _yieldUnit = widget.recipe!.yieldUnit;
       _instructions = widget.recipe!.instructions;
@@ -42,6 +45,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
 
   Future<void> _loadIngredients() async {
     final ingredients = await DatabaseHelper.instance.readAllIngredients();
+    final recipes = await DatabaseHelper.instance.readAllRecipes();
     
     final salaryStr = await DatabaseHelper.instance.getSetting('desiredSalary');
     final hoursStr = await DatabaseHelper.instance.getSetting('workedHoursPerMonth');
@@ -52,6 +56,8 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     setState(() {
       _availableIngredients = ingredients;
       _hourlyRate = rate;
+      _existingCategories = recipes.map((r) => r.category).toSet().toList();
+      if (_existingCategories.isEmpty) _existingCategories = ['Geral'];
     });
   }
 
@@ -190,6 +196,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       final recipe = Recipe(
         id: widget.recipe?.id,
         name: _name,
+        category: _category,
         yieldAmount: _yieldAmount,
         yieldUnit: _yieldUnit,
         instructions: _instructions,
@@ -253,6 +260,34 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            Autocomplete<String>(
+              initialValue: TextEditingValue(text: _category),
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text == '') {
+                  return _existingCategories;
+                }
+                return _existingCategories.where((String option) {
+                  return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                });
+              },
+              onSelected: (String selection) {
+                _category = selection;
+              },
+              fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                return TextFormField(
+                  controller: textEditingController,
+                  focusNode: focusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Grupo / Categoria da Receita',
+                    hintText: 'Digite ou escolha um grupo (ex: Massa, Recheio)',
+                    suffixIcon: Icon(Icons.arrow_drop_down),
+                  ),
+                  validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+                  onSaved: (v) => _category = v!,
+                );
+              },
             ),
             const SizedBox(height: 16),
             
