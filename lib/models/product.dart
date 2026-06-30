@@ -11,7 +11,8 @@ class Product {
   String unit; // Unidade de venda (fatia, unidade, caixa, etc)
   double yieldAmount; // Rendimento do produto (ex: 10 fatias)
 
-  List<ProductIngredient> ingredients;
+  List<ProductRecipe> recipes;
+  List<ProductExpense> extraExpenses;
 
   Product({
     this.id,
@@ -24,13 +25,17 @@ class Product {
     this.category = 'Geral',
     this.unit = 'unidade',
     this.yieldAmount = 1.0,
-    this.ingredients = const [],
+    this.recipes = const [],
+    this.extraExpenses = const [],
   });
 
   double get totalCost {
     double sum = 0;
-    for (var i in ingredients) {
-      sum += i.cost;
+    for (var r in recipes) {
+      sum += r.cost;
+    }
+    for (var e in extraExpenses) {
+      sum += e.cost;
     }
     return sum;
   }
@@ -72,21 +77,19 @@ class Product {
   }
 }
 
-class ProductIngredient {
+class ProductRecipe {
   int? id;
   int productId;
-  int ingredientId;
-  String ingredientName;
-  String ingredientUnit;
-  double quantityUsed;
+  int recipeId;
+  String recipeName;
+  double quantityUsed; // ex: usa 2 "rendimentos" daquela receita
   double cost;
 
-  ProductIngredient({
+  ProductRecipe({
     this.id,
     required this.productId,
-    required this.ingredientId,
-    this.ingredientName = '',
-    this.ingredientUnit = '',
+    required this.recipeId,
+    this.recipeName = '',
     required this.quantityUsed,
     required this.cost,
   });
@@ -95,18 +98,50 @@ class ProductIngredient {
     return {
       'id': id,
       'productid': productId,
-      'ingredientid': ingredientId,
+      'recipeid': recipeId,
       'quantityused': quantityUsed,
       'cost': cost,
     };
   }
 
-  factory ProductIngredient.fromMap(Map<String, dynamic> map) {
-    return ProductIngredient(
+  factory ProductRecipe.fromMap(Map<String, dynamic> map) {
+    return ProductRecipe(
       id: map['id'],
       productId: map['productid'] ?? map['productId'],
-      ingredientId: map['ingredientid'] ?? map['ingredientId'],
+      recipeId: map['recipeid'] ?? map['recipeId'],
       quantityUsed: (map['quantityused'] ?? map['quantityUsed'] as num).toDouble(),
+      cost: (map['cost'] as num).toDouble(),
+    );
+  }
+}
+
+class ProductExpense {
+  int? id;
+  int productId;
+  String name;
+  double cost;
+
+  ProductExpense({
+    this.id,
+    required this.productId,
+    required this.name,
+    required this.cost,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'productid': productId,
+      'name': name,
+      'cost': cost,
+    };
+  }
+
+  factory ProductExpense.fromMap(Map<String, dynamic> map) {
+    return ProductExpense(
+      id: map['id'],
+      productId: map['productid'] ?? map['productId'],
+      name: map['name'],
       cost: (map['cost'] as num).toDouble(),
     );
   }

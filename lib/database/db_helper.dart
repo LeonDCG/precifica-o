@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ingredient.dart';
 import '../models/product.dart';
+import '../models/recipe.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -34,6 +35,66 @@ class DatabaseHelper {
     return 1;
   }
 
+  // --- RECIPES CRUD ---
+  Future<Recipe> createRecipe(Recipe recipe) async {
+    var recData = recipe.toMap();
+    recData.remove('id');
+    final response = await _client.from('recipes').insert(recData).select().single();
+    final newRecId = response['id'] as int;
+    recipe.id = newRecId;
+
+    for (var ri in recipe.ingredients) {
+      ri.recipeId = newRecId;
+      var riData = ri.toMap();
+      riData.remove('id');
+      await _client.from('recipe_ingredients').insert(riData);
+    }
+    return recipe;
+  }
+
+  Future<List<Recipe>> readAllRecipes() async {
+    final response = await _client.from('recipes').select().order('name', ascending: true);
+    List<Recipe> recipes = response.map<Recipe>((json) => Recipe.fromMap(json)).toList();
+
+    final allIngredients = await readAllIngredients();
+
+    for (var recipe in recipes) {
+      final riMaps = await _client.from('recipe_ingredients').select().eq('recipeid', recipe.id!);
+      recipe.ingredients = riMaps.map<RecipeIngredient>((json) {
+        final ri = RecipeIngredient.fromMap(json);
+        try {
+          final ing = allIngredients.firstWhere((i) => i.id == ri.ingredientId);
+          ri.ingredientName = ing.name;
+          ri.ingredientUnit = ing.unit;
+        } catch (_) {}
+        return ri;
+      }).toList();
+    }
+    return recipes;
+  }
+
+  Future<int> deleteRecipe(int id) async {
+    await _client.from('recipe_ingredients').delete().eq('recipeid', id);
+    await _client.from('recipes').delete().eq('id', id);
+    return 1;
+  }
+
+  Future<int> updateRecipe(Recipe recipe) async {
+    var recData = recipe.toMap();
+    recData.remove('id');
+    await _client.from('recipes').update(recData).eq('id', recipe.id!);
+
+    // Recreate ingredients
+    await _client.from('recipe_ingredients').delete().eq('recipeid', recipe.id!);
+    for (var ri in recipe.ingredients) {
+      ri.recipeId = recipe.id!;
+      var riData = ri.toMap();
+      riData.remove('id');
+      await _client.from('recipe_ingredients').insert(riData);
+    }
+    return 1;
+  }
+
   // --- PRODUCTS CRUD ---
   Future<Product> createProduct(Product product) async {
     var prodData = product.toMap();
@@ -42,11 +103,17 @@ class DatabaseHelper {
     final newProdId = response['id'] as int;
     product.id = newProdId;
     
-    for (var pi in product.ingredients) {
-      pi.productId = newProdId;
-      var piData = pi.toMap();
-      piData.remove('id');
-      await _client.from('product_ingredients').insert(piData);
+    for (var pr in product.recipes) {
+      pr.productId = newProdId;
+      var prData = pr.toMap();
+      prData.remove('id');
+      await _client.from('product_recipes').insert(prData);
+    }
+    for (var pe in product.extraExpenses) {
+      pe.productId = newProdId;
+      var peData = pe.toMap();
+      peData.remove('id');
+      await _client.from('product_expenses').insert(peData);
     }
     return product;
   }
@@ -55,25 +122,28 @@ class DatabaseHelper {
     final productsResponse = await _client.from('products').select().order('name', ascending: true);
     List<Product> products = productsResponse.map<Product>((json) => Product.fromMap(json)).toList();
     
-    final allIngredients = await readAllIngredients();
+    final allRecipes = await readAllRecipes();
 
     for (var product in products) {
-      final piMaps = await _client.from('product_ingredients').select().eq('productid', product.id!);
-      product.ingredients = piMaps.map<ProductIngredient>((json) {
-        final pi = ProductIngredient.fromMap(json);
+      final prMaps = await _client.from('product_recipes').select().eq('productid', product.id!);
+      product.recipes = prMaps.map<ProductRecipe>((json) {
+        final pr = ProductRecipe.fromMap(json);
         try {
-          final ing = allIngredients.firstWhere((i) => i.id == pi.ingredientId);
-          pi.ingredientName = ing.name;
-          pi.ingredientUnit = ing.unit;
+          final rec = allRecipes.firstWhere((r) => r.id == pr.recipeId);
+          pr.recipeName = rec.name;
         } catch (_) {}
-        return pi;
+        return pr;
       }).toList();
+      
+      final peMaps = await _client.from('product_expenses').select().eq('productid', product.id!);
+      product.extraExpenses = peMaps.map<ProductExpense>((json) => ProductExpense.fromMap(json)).toList();
     }
     return products;
   }
 
   Future<int> deleteProduct(int id) async {
-    await _client.from('product_ingredients').delete().eq('productid', id);
+    await _client.from('product_recipes').delete().eq('productid', id);
+    await _client.from('product_expenses').delete().eq('productid', id);
     await _client.from('products').delete().eq('id', id);
     return 1;
   }
@@ -83,13 +153,22 @@ class DatabaseHelper {
     prodData.remove('id');
     await _client.from('products').update(prodData).eq('id', product.id!);
 
-    // Recreate ingredients
-    await _client.from('product_ingredients').delete().eq('productid', product.id!);
-    for (var pi in product.ingredients) {
-      pi.productId = product.id!;
-      var piData = pi.toMap();
-      piData.remove('id');
-      await _client.from('product_ingredients').insert(piData);
+    // Recreate recipes
+    await _client.from('product_recipes').delete().eq('productid', product.id!);
+    for (var pr in product.recipes) {
+      pr.productId = product.id!;
+      var prData = pr.toMap();
+      prData.remove('id');
+      await _client.from('product_recipes').insert(prData);
+    }
+
+    // Recreate expenses
+    await _client.from('product_expenses').delete().eq('productid', product.id!);
+    for (var pe in product.extraExpenses) {
+      pe.productId = product.id!;
+      var peData = pe.toMap();
+      peData.remove('id');
+      await _client.from('product_expenses').insert(peData);
     }
     return 1;
   }
@@ -111,36 +190,8 @@ class DatabaseHelper {
     // No-op for Supabase
   }
 
-  // --- SEED DATA (Massa de Teste) ---
+  // --- SEED DATA ---
   Future<void> seedData() async {
-    final ingredients = await readAllIngredients();
-    if (ingredients.isNotEmpty) return; // Já tem dados na nuvem
-
-    // 1. Insumos
-    final i1 = await createIngredient(Ingredient(name: 'Farinha de Trigo', unit: 'g', price: 5.0, quantity: 1000, type: 'ingredient', category: 'SECOS'));
-    final i2 = await createIngredient(Ingredient(name: 'Açúcar Refinado', unit: 'g', price: 4.5, quantity: 1000, type: 'ingredient', category: 'SECOS'));
-    final i3 = await createIngredient(Ingredient(name: 'Leite Condensado', unit: 'g', price: 6.0, quantity: 395, type: 'ingredient', category: 'LATICÍNIOS'));
-    final i4 = await createIngredient(Ingredient(name: 'Ovos', unit: 'unidade', price: 18.0, quantity: 30, type: 'ingredient', category: 'LATICÍNIOS')); 
-    final i5 = await createIngredient(Ingredient(name: 'Chocolate em Pó 50%', unit: 'g', price: 35.0, quantity: 1000, type: 'ingredient', category: 'SECOS'));
-    
-    // 2. Produto Final
-    await createProduct(Product(
-      name: 'Bolo de Brigadeiro Simples',
-      suggestedPrice: 80.0,
-      sellPrice: 80.0,
-      profitMarginPercent: 150,
-      imagePath: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      isFeatured: true,
-      category: 'Bolos Inteiros',
-      unit: 'unidade',
-      yieldAmount: 1.0,
-      ingredients: [
-        ProductIngredient(productId: 0, ingredientId: i1.id!, ingredientName: i1.name, ingredientUnit: i1.unit, quantityUsed: 300, cost: i1.unitPrice * 300),
-        ProductIngredient(productId: 0, ingredientId: i2.id!, ingredientName: i2.name, ingredientUnit: i2.unit, quantityUsed: 200, cost: i2.unitPrice * 200),
-        ProductIngredient(productId: 0, ingredientId: i4.id!, ingredientName: i4.name, ingredientUnit: i4.unit, quantityUsed: 4, cost: i4.unitPrice * 4),
-        ProductIngredient(productId: 0, ingredientId: i5.id!, ingredientName: i5.name, ingredientUnit: i5.unit, quantityUsed: 100, cost: i5.unitPrice * 100),
-        ProductIngredient(productId: 0, ingredientId: i3.id!, ingredientName: i3.name, ingredientUnit: i3.unit, quantityUsed: 395, cost: i3.unitPrice * 395),
-      ],
-    ));
+    // No-op - we don't seed manually since Supabase has real data
   }
 }

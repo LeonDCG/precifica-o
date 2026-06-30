@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/product.dart';
-import '../models/ingredient.dart';
+import '../models/recipe.dart';
 import '../database/db_helper.dart';
 
 class AddProductScreen extends StatefulWidget {
@@ -26,8 +26,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-  List<Ingredient> _availableIngredients = [];
-  final List<ProductIngredient> _selectedIngredients = [];
+  List<Recipe> _availableRecipes = [];
+  final List<ProductRecipe> _selectedRecipes = [];
+  final List<ProductExpense> _expenses = [];
 
   List<String> _existingCategories = ['Geral'];
 
@@ -42,17 +43,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _profitMarginPercent = widget.product!.profitMarginPercent;
       _sellPrice = widget.product!.sellPrice;
       _imagePath = widget.product!.imagePath;
-      _selectedIngredients.addAll(widget.product!.ingredients);
+      _selectedRecipes.addAll(widget.product!.recipes);
+      _expenses.addAll(widget.product!.extraExpenses);
     }
     _loadInitialData();
   }
 
   Future<void> _loadInitialData() async {
-    final ingredients = await DatabaseHelper.instance.readAllIngredients();
+    final recipes = await DatabaseHelper.instance.readAllRecipes();
     final products = await DatabaseHelper.instance.readAllProducts();
     
     setState(() {
-      _availableIngredients = ingredients;
+      _availableRecipes = recipes;
       _existingCategories = products.map((p) => p.category).toSet().toList();
       if (_existingCategories.isEmpty) _existingCategories = ['Geral'];
     });
@@ -75,8 +77,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  void _showAddIngredientDialog() {
-    Ingredient? selectedIngredient;
+  void _showAddRecipeDialog() {
+    Recipe? selectedRecipe;
     double qty = 1;
 
     showDialog(
@@ -85,31 +87,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
-              title: const Text('Adicionar Insumo'),
+              title: const Text('Adicionar Receita'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButton<Ingredient>(
+                  DropdownButton<Recipe>(
                     isExpanded: true,
-                    hint: const Text('Selecione o insumo'),
-                    value: selectedIngredient,
-                    items: _availableIngredients.map((ing) {
+                    hint: const Text('Selecione a receita'),
+                    value: selectedRecipe,
+                    items: _availableRecipes.map((r) {
                       return DropdownMenuItem(
-                        value: ing,
-                        child: Text('${ing.name} (R\$ ${ing.unitPrice.toStringAsFixed(2)}/${ing.unit})'),
+                        value: r,
+                        child: Text('${r.name} (R\$ ${r.costPerYield.toStringAsFixed(2)}/${r.yieldUnit})'),
                       );
                     }).toList(),
                     onChanged: (val) {
                       setStateDialog(() {
-                        selectedIngredient = val;
+                        selectedRecipe = val;
                       });
                     },
                   ),
                   const SizedBox(height: 16),
-                  if (selectedIngredient != null)
+                  if (selectedRecipe != null)
                     TextField(
                       decoration: InputDecoration(
-                        labelText: 'Quantidade usada (${selectedIngredient!.unit})',
+                        labelText: 'Quantidade usada (${selectedRecipe!.yieldUnit})',
                         border: const OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
@@ -126,15 +128,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (selectedIngredient != null && qty > 0) {
-                      final cost = selectedIngredient!.unitPrice * qty;
+                    if (selectedRecipe != null && qty > 0) {
+                      final cost = selectedRecipe!.costPerYield * qty;
                       setState(() {
-                        _selectedIngredients.add(
-                          ProductIngredient(
+                        _selectedRecipes.add(
+                          ProductRecipe(
                             productId: 0,
-                            ingredientId: selectedIngredient!.id!,
-                            ingredientName: selectedIngredient!.name,
-                            ingredientUnit: selectedIngredient!.unit,
+                            recipeId: selectedRecipe!.id!,
+                            recipeName: selectedRecipe!.name,
                             quantityUsed: qty,
                             cost: cost,
                           ),
@@ -153,6 +154,60 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
+  void _showAddExpenseDialog() {
+    String expenseName = '';
+    double expenseCost = 0;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Gasto Extra (Embalagem, etc)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                decoration: const InputDecoration(labelText: 'Descrição (ex: Caixa)'),
+                onChanged: (val) => expenseName = val,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: const InputDecoration(labelText: 'Custo (R\$)'),
+                keyboardType: TextInputType.number,
+                onChanged: (val) {
+                  expenseCost = double.tryParse(val.replaceAll(',', '.')) ?? 0;
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (expenseName.isNotEmpty && expenseCost > 0) {
+                  setState(() {
+                    _expenses.add(
+                      ProductExpense(
+                        productId: 0,
+                        name: expenseName,
+                        cost: expenseCost,
+                      ),
+                    );
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Adicionar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _saveProduct() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
@@ -164,7 +219,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
         yieldAmount: _yieldAmount,
         profitMarginPercent: _profitMarginPercent,
         sellPrice: _sellPrice,
-        ingredients: _selectedIngredients,
+        recipes: _selectedRecipes,
+        extraExpenses: _expenses,
         imagePath: _imagePath,
         isFeatured: widget.product?.isFeatured ?? false,
       );
@@ -180,7 +236,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   double get _currentTotalCost {
     double sum = 0;
-    for (var i in _selectedIngredients) sum += i.cost;
+    for (var r in _selectedRecipes) sum += r.cost;
+    for (var e in _expenses) sum += e.cost;
     return sum;
   }
 
@@ -192,7 +249,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Novo Produto'),
+        title: Text(widget.product == null ? 'Novo Produto' : 'Editar Produto'),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -307,28 +364,55 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ),
             const SizedBox(height: 16),
             
-            // --- Insumos ---
+            // --- Receitas ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Insumos Utilizados', style: Theme.of(context).textTheme.titleMedium),
+                Text('Receitas Utilizadas', style: Theme.of(context).textTheme.titleMedium),
                 TextButton.icon(
-                  onPressed: _showAddIngredientDialog,
+                  onPressed: _showAddRecipeDialog,
                   icon: const Icon(Icons.add),
                   label: const Text('Adicionar'),
                 ),
               ],
             ),
-            ..._selectedIngredients.map((i) => ListTile(
-                  title: Text(i.ingredientName),
-                  subtitle: Text('Qtd: ${i.quantityUsed} ${i.ingredientUnit}'),
+            ..._selectedRecipes.map((r) => ListTile(
+                  title: Text(r.recipeName),
+                  subtitle: Text('Qtd: ${r.quantityUsed}'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('R\$ ${i.cost.toStringAsFixed(2)}'),
+                      Text('R\$ ${r.cost.toStringAsFixed(2)}'),
                       IconButton(
                         icon: const Icon(Icons.remove_circle, color: Colors.red),
-                        onPressed: () => setState(() => _selectedIngredients.remove(i)),
+                        onPressed: () => setState(() => _selectedRecipes.remove(r)),
+                      )
+                    ],
+                  ),
+                )),
+            const Divider(),
+
+            // --- Gastos Extras ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Gastos Extras', style: Theme.of(context).textTheme.titleMedium),
+                TextButton.icon(
+                  onPressed: _showAddExpenseDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Adicionar'),
+                ),
+              ],
+            ),
+            ..._expenses.map((e) => ListTile(
+                  title: Text(e.name),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('R\$ ${e.cost.toStringAsFixed(2)}'),
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle, color: Colors.red),
+                        onPressed: () => setState(() => _expenses.remove(e)),
                       )
                     ],
                   ),
@@ -339,7 +423,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
