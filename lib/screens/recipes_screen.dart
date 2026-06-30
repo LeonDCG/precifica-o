@@ -112,78 +112,49 @@ class _RecipesScreenState extends State<RecipesScreen> {
                                     ),
                                   ),
                                 ),
-                                ...categoryRecipes.map((recipe) {
-                                  return InkWell(
-                                    onTap: () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(builder: (context) => AddRecipeScreen(recipe: recipe)),
-                                      );
-                                      _refreshRecipes();
-                                    },
-                                    child: Card(
-                                      margin: const EdgeInsets.only(bottom: 12),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(16.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    recipe.name,
-                                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(),
-                                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                                  onPressed: () async {
-                                                    await DatabaseHelper.instance.deleteRecipe(recipe.id!);
-                                                    _refreshRecipes();
-                                                  },
-                                                ),
-                                              ],
+                                 ...categoryRecipes.map((recipe) {
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    elevation: 1,
+                                    child: ListTile(
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                      onTap: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => AddRecipeScreen(recipe: recipe)),
+                                        );
+                                        _refreshRecipes();
+                                      },
+                                      title: Text(
+                                        recipe.name,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                      subtitle: Text(
+                                        'Rende: ${recipe.yieldAmount} ${recipe.yieldUnit}  •  Custo: R\$ ${recipe.totalCost.toStringAsFixed(2)}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'R\$ ${recipe.costPerYield.toStringAsFixed(2)} / ${recipe.yieldUnit}',
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.secondary,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
                                             ),
-                                            const SizedBox(height: 12),
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text('RENDE', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                                                    Text('${recipe.yieldAmount} ${recipe.yieldUnit}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                  ],
-                                                ),
-                                                Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text('CUSTO TOTAL', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                                                    Text('R\$ ${recipe.totalCost.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                  ],
-                                                ),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                                  decoration: BoxDecoration(
-                                                    color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                  ),
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                                    children: [
-                                                      Text('CUSTO / ${recipe.yieldUnit.toUpperCase()}', style: TextStyle(fontSize: 8, color: Theme.of(context).colorScheme.secondary, fontWeight: FontWeight.bold)),
-                                                      Text('R\$ ${recipe.costPerYield.toStringAsFixed(2)}', style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontWeight: FontWeight.bold)),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                            onPressed: () async {
+                                              await DatabaseHelper.instance.deleteRecipe(recipe.id!);
+                                              _refreshRecipes();
+                                            },
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
