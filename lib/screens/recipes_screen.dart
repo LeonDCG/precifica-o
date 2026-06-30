@@ -14,6 +14,7 @@ class RecipesScreen extends StatefulWidget {
 class _RecipesScreenState extends State<RecipesScreen> {
   List<Recipe> _recipes = [];
   bool _isLoading = true;
+  final Set<String> _collapsedCategories = {};
 
   @override
   void initState() {
@@ -96,22 +97,44 @@ class _RecipesScreenState extends State<RecipesScreen> {
                           itemBuilder: (context, catIndex) {
                             final category = groupedRecipes.keys.elementAt(catIndex);
                             final categoryRecipes = groupedRecipes[category]!;
+                            final isCollapsed = _collapsedCategories.contains(category);
 
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8, bottom: 16),
-                                  child: Text(
-                                    category.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2,
-                                      color: Theme.of(context).colorScheme.primary,
+                                InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      if (isCollapsed) {
+                                        _collapsedCategories.remove(category);
+                                      } else {
+                                        _collapsedCategories.add(category);
+                                      }
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${category.toUpperCase()} (${categoryRecipes.length})',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1.2,
+                                            color: Theme.of(context).colorScheme.primary,
+                                          ),
+                                        ),
+                                        Icon(
+                                          isCollapsed ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_down,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
+                                if (!isCollapsed)
                                  ...categoryRecipes.map((recipe) {
                                   return Card(
                                     margin: const EdgeInsets.only(bottom: 8),
