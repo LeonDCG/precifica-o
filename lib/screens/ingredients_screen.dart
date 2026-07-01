@@ -172,56 +172,28 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
     if (item.type == 'packaging') icon = Icons.inventory_2;
     if (item.type == 'operational') icon = Icons.bolt;
     return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
+      elevation: 1,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         onTap: () => _showAddIngredientSheet(ingredient: item),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, color: Theme.of(context).primaryColor, size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        Text(item.category.isNotEmpty ? item.category : 'Sem Categoria', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                      ],
-                    ),
-                  ),
-
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                    onPressed: () async {
-                      await DatabaseHelper.instance.deleteIngredient(item.id!);
-                      _refreshIngredients();
-                    },
-                  )
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Custo: R\$ ${item.unitPrice.toStringAsFixed(2)} por ${item.unit}',
-                    style: TextStyle(color: Colors.grey[800], fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-            ],
-          ),
+        leading: Icon(icon, color: Theme.of(context).primaryColor, size: 24),
+        title: Text(
+          item.name,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        subtitle: Text(
+          'Comprou: ${item.quantity}${item.unit} por R\$ ${item.price.toStringAsFixed(2)}  •  Custo: R\$ ${item.unitPrice.toStringAsFixed(2)}/${item.unit}',
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+        ),
+        trailing: IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+          onPressed: () async {
+            await DatabaseHelper.instance.deleteIngredient(item.id!);
+            _refreshIngredients();
+          },
         ),
       ),
     );
