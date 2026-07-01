@@ -168,32 +168,42 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
   }
 
   Widget _buildItemCard(Ingredient item) {
-    IconData icon = Icons.eco;
-    if (item.type == 'packaging') icon = Icons.inventory_2;
-    if (item.type == 'operational') icon = Icons.bolt;
     return Card(
       elevation: 1,
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         onTap: () => _showAddIngredientSheet(ingredient: item),
-        leading: Icon(icon, color: Theme.of(context).primaryColor, size: 24),
         title: Text(
           item.name,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         subtitle: Text(
-          'Comprou: ${item.quantity}${item.unit} por R\$ ${item.price.toStringAsFixed(2)}  •  Custo: R\$ ${item.unitPrice.toStringAsFixed(2)}/${item.unit}',
-          style: const TextStyle(fontSize: 11, color: Colors.grey),
+          'Comprou: ${item.quantity}${item.unit} por R\$ ${item.price.toStringAsFixed(2)}',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
         ),
-        trailing: IconButton(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-          onPressed: () async {
-            await DatabaseHelper.instance.deleteIngredient(item.id!);
-            _refreshIngredients();
-          },
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'R\$ ${item.unitPrice.toStringAsFixed(2)} / ${item.unit}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.secondary,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+              onPressed: () async {
+                await DatabaseHelper.instance.deleteIngredient(item.id!);
+                _refreshIngredients();
+              },
+            ),
+          ],
         ),
       ),
     );
