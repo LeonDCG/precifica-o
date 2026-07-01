@@ -424,14 +424,44 @@ class _AddProductScreenState extends State<AddProductScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.brown.withOpacity(0.1)),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Custo Total: R\$ ${_currentTotalCost.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 16),
+                  Text('1. RESUMO DOS CUSTOS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Custo Total (Lote):', style: TextStyle(fontWeight: FontWeight.w500)),
+                      Text('R\$ ${_currentTotalCost.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  if (_yieldAmount > 1) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Custo por $_unit (Rendimento):', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                        Text('R\$ ${(_currentTotalCost / _yieldAmount).toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: Divider(),
+                  ),
+                  
+                  Text('2. DEFINE SEU LUCRO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                  const SizedBox(height: 12),
                   TextFormField(
-                    decoration: const InputDecoration(labelText: 'Margem de Lucro Desejada (%)', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(
+                      labelText: 'Margem de Lucro Desejada (%)', 
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
                     keyboardType: TextInputType.number,
                     initialValue: _profitMarginPercent.toString(),
                     onChanged: (v) {
@@ -445,25 +475,35 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Preço Sugerido (Total):', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                      const Text('Preço Sugerido (Lote):', style: TextStyle(fontWeight: FontWeight.w500)),
                       Text('R\$ ${_currentSuggestedPrice.toStringAsFixed(2)}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
                     ],
                   ),
-                  if (_yieldAmount > 1)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Sugerido por $_unit:', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 12)),
-                          Text('R\$ ${(_currentSuggestedPrice / _yieldAmount).toStringAsFixed(2)}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
+                  if (_yieldAmount > 1) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Sugerido por $_unit:', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                        Text('R\$ ${(_currentSuggestedPrice / _yieldAmount).toStringAsFixed(2)}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+                      ],
                     ),
-                  const SizedBox(height: 16),
+                  ],
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: Divider(),
+                  ),
+
+                  Text('3. PREÇO DE VENDA PRATICADO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                  const SizedBox(height: 12),
                   TextFormField(
                     initialValue: _sellPrice > 0 ? _sellPrice.toString() : null,
-                    decoration: const InputDecoration(labelText: 'Preço de Venda Final (Total R\$)', border: OutlineInputBorder(), prefixText: 'R\$ '),
+                    decoration: const InputDecoration(
+                      labelText: 'Preço de Venda Final (Total R\$)', 
+                      border: OutlineInputBorder(), 
+                      prefixText: 'R\$ ',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
                     keyboardType: TextInputType.number,
                     validator: (v) => v!.isEmpty ? 'Informe o preço de venda' : null,
                     onChanged: (v) {
@@ -473,17 +513,91 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     },
                     onSaved: (v) => _sellPrice = double.tryParse(v!.replaceAll(',', '.')) ?? 0,
                   ),
-                  if (_yieldAmount > 1 && _sellPrice > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Venda por $_unit:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          Text('R\$ ${(_sellPrice / _yieldAmount).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        ],
-                      ),
+                  if (_yieldAmount > 1 && _sellPrice > 0) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Venda por $_unit:', style: const TextStyle(fontWeight: FontWeight.w500)),
+                        Text('R\$ ${(_sellPrice / _yieldAmount).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
                     ),
+                  ],
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: Divider(),
+                  ),
+
+                  // Lucro Praticado Real
+                  Builder(
+                    builder: (context) {
+                      final realProfit = _sellPrice - _currentTotalCost;
+                      final isPositive = realProfit >= 0;
+                      final profitPerUnit = _yieldAmount > 0 ? realProfit / _yieldAmount : 0.0;
+
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isPositive ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: isPositive ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isPositive ? '4. SEU LUCRO PROJETADO' : '4. PREJUÍZO DETECTADO',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isPositive ? Colors.green[800] : Colors.red[800],
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isPositive ? 'Lucro Total (Lote):' : 'Prejuízo Total:',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: isPositive ? Colors.green[900] : Colors.red[900]),
+                                ),
+                                Text(
+                                  'R\$ ${realProfit.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: isPositive ? Colors.green[800] : Colors.red[800],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_yieldAmount > 1) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Lucro por $_unit:',
+                                    style: TextStyle(fontSize: 13, color: isPositive ? Colors.green[700] : Colors.red[700]),
+                                  ),
+                                  Text(
+                                    'R\$ ${profitPerUnit.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: isPositive ? Colors.green[800] : Colors.red[800],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    }
+                  ),
                 ],
               ),
             ),

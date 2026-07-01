@@ -179,17 +179,52 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                                 ),
                                               ),
                                             ),
-                                          // Selo de Destaque
-                                          if (product.isFeatured || _products.indexOf(product) == 0) // Para a demo, o primeiro é sempre destaque
+                                            // Selo de Destaque e Lucro
                                             Positioned(
                                               top: 16, left: 16,
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                decoration: BoxDecoration(
-                                                  color: Theme.of(context).colorScheme.secondary,
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: const Text('DESTAQUE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  if (product.isFeatured || _products.indexOf(product) == 0)
+                                                    Container(
+                                                      margin: const EdgeInsets.only(bottom: 6),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: Theme.of(context).colorScheme.secondary,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      child: const Text('DESTAQUE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    ),
+                                                  Builder(
+                                                    builder: (context) {
+                                                      final totalVal = product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice;
+                                                      final profit = totalVal - product.totalCost;
+                                                      final profitPerUnit = product.yieldAmount > 0 ? profit / product.yieldAmount : 0.0;
+                                                      final isPositive = profit >= 0;
+
+                                                      return Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                        decoration: BoxDecoration(
+                                                          color: isPositive ? Colors.green[800] : Colors.red[800],
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          boxShadow: [
+                                                            BoxShadow(
+                                                              color: Colors.black.withOpacity(0.2),
+                                                              blurRadius: 4,
+                                                              offset: const Offset(0, 2),
+                                                            )
+                                                          ],
+                                                        ),
+                                                        child: Text(
+                                                          product.yieldAmount > 1 
+                                                              ? 'LUCRO: R\$ ${profitPerUnit.toStringAsFixed(2)} / ${product.unit}'
+                                                              : 'LUCRO: R\$ ${profit.toStringAsFixed(2)}',
+                                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                        ),
+                                                      );
+                                                    }
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           // Botão de deletar
