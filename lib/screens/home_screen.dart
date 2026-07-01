@@ -3,6 +3,7 @@ import 'dashboard_screen.dart';
 import 'ingredients_screen.dart';
 import 'recipes_screen.dart';
 import 'catalog_screen.dart';
+import 'sales_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -19,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const IngredientsScreen(),
     const RecipesScreen(),
     const CatalogScreen(),
+    const SalesScreen(),
   ];
 
   @override
@@ -53,6 +55,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.shopping_bag_outlined),
             activeIcon: Icon(Icons.shopping_bag),
             label: 'Catálogo',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.point_of_sale_outlined),
+            activeIcon: Icon(Icons.point_of_sale),
+            label: 'Vendas',
           ),
         ],
       ),

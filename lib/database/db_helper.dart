@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ingredient.dart';
 import '../models/product.dart';
 import '../models/recipe.dart';
+import '../models/sale.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -184,6 +185,24 @@ class DatabaseHelper {
       return response['value'] as String;
     }
     return null;
+  }
+
+  // --- SALES CRUD ---
+  Future<Sale> createSale(Sale sale) async {
+    var data = sale.toMap();
+    data.remove('id');
+    final response = await _client.from('sales').insert(data).select().single();
+    return Sale.fromMap(response);
+  }
+
+  Future<List<Sale>> readAllSales() async {
+    final response = await _client.from('sales').select().order('saledate', ascending: false);
+    return response.map<Sale>((json) => Sale.fromMap(json)).toList();
+  }
+
+  Future<int> deleteSale(int id) async {
+    await _client.from('sales').delete().eq('id', id);
+    return 1;
   }
 
   Future close() async {
