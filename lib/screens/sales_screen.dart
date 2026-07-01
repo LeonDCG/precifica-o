@@ -107,7 +107,6 @@ class _SalesScreenState extends State<SalesScreen> {
                     children: [
                       Text('Histórico de Vendas', style: Theme.of(context).textTheme.titleLarge),
                       FloatingActionButton.extended(
-                        mini: true,
                         onPressed: () async {
                           final result = await Navigator.push(
                             context,
