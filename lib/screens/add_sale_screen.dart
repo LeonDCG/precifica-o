@@ -25,6 +25,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
   String _sellerType = 'me'; // 'me' ou 'other'
   String _sellerName = '';
   double _commissionPercent = 10.0;
+  String _saleUnitType = 'unit'; // 'unit' ou 'whole'
   
   bool _isLoading = true;
 
@@ -44,12 +45,21 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
 
   double get _productCost {
     if (_selectedProduct == null) return 0.0;
-    return _selectedProduct!.totalCost / _selectedProduct!.yieldAmount;
+    if (_saleUnitType == 'unit') {
+      return _selectedProduct!.totalCost / _selectedProduct!.yieldAmount;
+    } else {
+      return _selectedProduct!.totalCost;
+    }
   }
 
   double get _productPrice {
     if (_selectedProduct == null) return 0.0;
-    return _selectedProduct!.sellPrice > 0 ? _selectedProduct!.sellPrice : _selectedProduct!.suggestedPrice;
+    double basePrice = _selectedProduct!.sellPrice > 0 ? _selectedProduct!.sellPrice : _selectedProduct!.suggestedPrice;
+    if (_saleUnitType == 'unit') {
+      return basePrice / _selectedProduct!.yieldAmount;
+    } else {
+      return basePrice;
+    }
   }
 
   double get _effectiveSellPrice {
@@ -87,9 +97,12 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
     if (_formKey.currentState!.validate() && _selectedProduct != null) {
       _formKey.currentState!.save();
       
+      final suffix = _selectedProduct!.yieldAmount > 1 
+          ? (_saleUnitType == 'unit' ? ' (${_selectedProduct!.unit})' : ' (Inteiro)')
+          : '';
       final sale = Sale(
         productId: _selectedProduct!.id,
-        productName: _selectedProduct!.name,
+        productName: _selectedProduct!.name + suffix,
         quantity: _quantity,
         totalValue: _totalSaleValue,
         totalCost: _totalSaleCost,
@@ -141,9 +154,13 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
               value: _selectedProduct,
               items: _products.map<DropdownMenuItem<Product>>((p) {
                 final price = p.sellPrice > 0 ? p.sellPrice : p.suggestedPrice;
+                final unitPrice = p.yieldAmount > 1 ? price / p.yieldAmount : price;
+                final details = p.yieldAmount > 1 
+                    ? 'Inteiro: R\$ ${price.toStringAsFixed(2)} / ${p.unit}: R\$ ${unitPrice.toStringAsFixed(2)}'
+                    : 'R\$ ${price.toStringAsFixed(2)}';
                 return DropdownMenuItem<Product>(
                   value: p,
-                  child: Text('${p.name} (R\$ ${price.toStringAsFixed(2)} / ${p.unit})'),
+                  child: Text('${p.name} ($details)'),
                 );
               }).toList(),
               validator: (v) => v == null ? 'Selecione um produto' : null,
@@ -151,20 +168,60 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                 setState(() {
                   _selectedProduct = val;
                   _customSellPrice = 0.0; // Reset preço customizado ao mudar produto
+                  if (val != null && val.yieldAmount > 1) {
+                    _saleUnitType = 'unit';
+                  } else {
+                    _saleUnitType = 'whole';
+                  }
                 });
               },
             ),
             const SizedBox(height: 16),
             
             if (_selectedProduct != null) ...[
+              if (_selectedProduct!.yieldAmount > 1) ...[
+                Text('Unidade de Venda:', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    ChoiceChip(
+                      label: Text('${_selectedProduct!.unit.toUpperCase()} (Fatia/Pedaço)'),
+                      selected: _saleUnitType == 'unit',
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _saleUnitType = 'unit';
+                            _customSellPrice = 0.0;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    ChoiceChip(
+                      label: const Text('PRODUTO INTEIRO'),
+                      selected: _saleUnitType == 'whole',
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _saleUnitType = 'whole';
+                            _customSellPrice = 0.0;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
               // Quantidade e Preço de Venda
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
+                      key: ValueKey('${_selectedProduct!.id}_${_saleUnitType}'),
                       initialValue: _quantity.toString(),
                       decoration: InputDecoration(
-                        labelText: 'Qtd Vendida (${_selectedProduct!.unit})',
+                        labelText: 'Qtd Vendida (${_saleUnitType == 'unit' ? _selectedProduct!.unit : 'inteiro'})',
                         border: const OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
