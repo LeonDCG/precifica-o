@@ -139,9 +139,9 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                 border: OutlineInputBorder(),
               ),
               value: _selectedProduct,
-              items: _products.map((p) {
+              items: _products.map<DropdownMenuItem<Product>>((p) {
                 final price = p.sellPrice > 0 ? p.sellPrice : p.suggestedPrice;
-                return DropdownMenuItem(
+                return DropdownMenuItem<Product>(
                   value: p,
                   child: Text('${p.name} (R\$ ${price.toStringAsFixed(2)} / ${p.unit})'),
                 );
