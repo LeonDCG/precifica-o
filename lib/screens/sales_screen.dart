@@ -14,6 +14,7 @@ class SalesScreen extends StatefulWidget {
 class _SalesScreenState extends State<SalesScreen> {
   List<Sale> _sales = [];
   bool _isLoading = true;
+  String _selectedPeriod = 'month'; // 'day', 'week', 'month', 'all'
 
   @override
   void initState() {
@@ -30,26 +31,62 @@ class _SalesScreenState extends State<SalesScreen> {
     });
   }
 
+  List<Sale> get _filteredSales {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final weekStart = todayStart.subtract(const Duration(days: 6));
+    final monthStart = DateTime(now.year, now.month, 1);
+
+    return _sales.where((s) {
+      final sDate = DateTime(s.saleDate.year, s.saleDate.month, s.saleDate.day);
+      if (_selectedPeriod == 'day') {
+        return sDate.isAtSameMomentAs(todayStart);
+      } else if (_selectedPeriod == 'week') {
+        return sDate.compareTo(weekStart) >= 0;
+      } else if (_selectedPeriod == 'month') {
+        return sDate.compareTo(monthStart) >= 0;
+      }
+      return true; // 'all'
+    }).toList();
+  }
+
   double get _totalRevenue {
     double sum = 0.0;
-    for (var s in _sales) sum += s.totalValue;
+    for (var s in _filteredSales) sum += s.totalValue;
     return sum;
   }
 
   double get _totalCommission {
     double sum = 0.0;
-    for (var s in _sales) sum += s.commissionValue;
+    for (var s in _filteredSales) sum += s.commissionValue;
     return sum;
   }
 
   double get _totalNetProfit {
     double sum = 0.0;
-    for (var s in _sales) sum += s.netProfit;
+    for (var s in _filteredSales) sum += s.netProfit;
     return sum;
+  }
+
+  double get _ticketMedio {
+    final list = _filteredSales;
+    if (list.isEmpty) return 0.0;
+    return _totalRevenue / list.length;
+  }
+
+  List<MapEntry<String, double>> get _topProducts {
+    final Map<String, double> counts = {};
+    for (var s in _filteredSales) {
+      counts[s.productName] = (counts[s.productName] ?? 0.0) + s.quantity;
+    }
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sorted.take(3).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final list = _filteredSales;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
@@ -67,14 +104,30 @@ class _SalesScreenState extends State<SalesScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Métricas Rápidas
+                // Métricas Rápidas e Período
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Resumo de Vendas', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 24)),
-                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Resumo de Vendas', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 22)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      // Filtro de Período (ChoiceChips)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildPeriodChip('Hoje', 'day'),
+                          _buildPeriodChip('7 Dias', 'week'),
+                          _buildPeriodChip('Este Mês', 'month'),
+                          _buildPeriodChip('Tudo', 'all'),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
                       Row(
                         children: [
                           _buildMetricCard(
@@ -99,7 +152,103 @@ class _SalesScreenState extends State<SalesScreen> {
                     ],
                   ),
                 ),
-                
+
+                // Insights do Período
+                if (list.isNotEmpty) ...[
+                  Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    elevation: 0.5,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.black.withOpacity(0.05)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.analytics_outlined, size: 16, color: Theme.of(context).primaryColor),
+                              const SizedBox(width: 6),
+                              Text(
+                                'INSIGHTS DO PERÍODO',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).primaryColor,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Volume de Vendas', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                    const SizedBox(height: 2),
+                                    Text('${list.length} transações', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Ticket Médio', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                    const SizedBox(height: 2),
+                                    Text('R\$ ${_ticketMedio.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_topProducts.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            const Divider(height: 1),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Produtos Mais Vendidos:',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey[700]),
+                            ),
+                            const SizedBox(height: 4),
+                            ..._topProducts.asMap().entries.map((entry) {
+                              final idx = entry.key + 1;
+                              final name = entry.value.key;
+                              final qty = entry.value.value;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 2.0),
+                                child: Row(
+                                  children: [
+                                    Text('$idxº ', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor, fontSize: 11)),
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                    Text(
+                                      '${qty.toStringAsFixed(0)} un.',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Row(
@@ -126,13 +275,13 @@ class _SalesScreenState extends State<SalesScreen> {
                 
                 // Lista de Vendas
                 Expanded(
-                  child: _sales.isEmpty
-                      ? const Center(child: Text('Nenhuma venda registrada.'))
+                  child: list.isEmpty
+                      ? const Center(child: Text('Nenhuma venda no período selecionado.'))
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _sales.length,
+                          itemCount: list.length,
                           itemBuilder: (context, index) {
-                            final sale = _sales[index];
+                            final sale = list[index];
                             final formattedDate = '${sale.saleDate.day}/${sale.saleDate.month}/${sale.saleDate.year}';
                             
                             return Card(
@@ -193,6 +342,31 @@ class _SalesScreenState extends State<SalesScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildPeriodChip(String label, String period) {
+    final isSelected = _selectedPeriod == period;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      labelStyle: TextStyle(
+        fontSize: 11,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? Colors.white : Colors.black87,
+      ),
+      selectedColor: Theme.of(context).primaryColor,
+      backgroundColor: Colors.grey[200],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _selectedPeriod = period;
+          });
+        }
+      },
     );
   }
 
