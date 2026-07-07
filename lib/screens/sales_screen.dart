@@ -15,11 +15,58 @@ class _SalesScreenState extends State<SalesScreen> {
   List<Sale> _sales = [];
   bool _isLoading = true;
   String _selectedPeriod = 'month'; // 'day', 'week', 'month', 'all'
+  double _monthlyTarget = 0.0;
 
   @override
   void initState() {
     super.initState();
     _refreshSales();
+    _loadTarget();
+  }
+
+  Future<void> _loadTarget() async {
+    final targetStr = await DatabaseHelper.instance.getSetting('salesTarget');
+    if (targetStr != null) {
+      setState(() {
+        _monthlyTarget = double.tryParse(targetStr) ?? 0.0;
+      });
+    }
+  }
+
+  void _showSetTargetDialog() {
+    final controller = TextEditingController(text: _monthlyTarget > 0 ? _monthlyTarget.toStringAsFixed(0) : '');
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Definir Meta de Lucro do Mês'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Valor da Meta (R\$)',
+            prefixText: 'R\$ ',
+            border: OutlineInputBorder(),
+          ),
+          keyboardType: TextInputType.number,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newTarget = double.tryParse(controller.text) ?? 0.0;
+              await DatabaseHelper.instance.saveSetting('salesTarget', newTarget.toString());
+              setState(() {
+                _monthlyTarget = newTarget;
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _refreshSales() async {
@@ -243,6 +290,116 @@ class _SalesScreenState extends State<SalesScreen> {
                             }),
                           ],
                         ],
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Card de Meta Mensal
+                if (_selectedPeriod == 'month') ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                    child: Card(
+                      elevation: 0.5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.black.withOpacity(0.05)),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.flag_outlined, size: 16, color: Theme.of(context).primaryColor),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'META DE LUCRO MENSAL',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).primaryColor,
+                                        letterSpacing: 1.0,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  icon: const Icon(Icons.edit, size: 14, color: Colors.grey),
+                                  onPressed: _showSetTargetDialog,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (_monthlyTarget <= 0) ...[
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Nenhuma meta definida para este mês.',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      minimumSize: const Size(0, 0),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    onPressed: _showSetTargetDialog,
+                                    child: const Text('Definir Meta', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              Builder(
+                                builder: (context) {
+                                  final progress = _monthlyTarget > 0 ? (_totalNetProfit / _monthlyTarget).clamp(0.0, 1.0) : 0.0;
+                                  final percent = (progress * 100).toStringAsFixed(0);
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'R\$ ${_totalNetProfit.toStringAsFixed(2)} de R\$ ${_monthlyTarget.toStringAsFixed(0)}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                          ),
+                                          Text(
+                                            '$percent%',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.secondary,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: progress,
+                                          backgroundColor: Colors.grey[200],
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.secondary,
+                                          ),
+                                          minHeight: 8,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
