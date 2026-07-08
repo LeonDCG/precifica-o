@@ -190,10 +190,18 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                                       margin: const EdgeInsets.only(bottom: 6),
                                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                                       decoration: BoxDecoration(
-                                                        color: Theme.of(context).colorScheme.secondary,
-                                                        borderRadius: BorderRadius.circular(8),
+                                                        color: const Color(0xFFC29B62), // brandGold
+                                                        borderRadius: BorderRadius.circular(20), // Cápsula
                                                       ),
-                                                      child: const Text('DESTAQUE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                      child: const Text(
+                                                        'DESTAQUE', 
+                                                        style: TextStyle(
+                                                          color: Colors.white, 
+                                                          fontSize: 9, 
+                                                          fontWeight: FontWeight.bold,
+                                                          letterSpacing: 0.8,
+                                                        ),
+                                                      ),
                                                     ),
                                                   Builder(
                                                     builder: (context) {
@@ -205,21 +213,19 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                                       return Container(
                                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                                         decoration: BoxDecoration(
-                                                          color: isPositive ? Colors.green[800] : Colors.red[800],
-                                                          borderRadius: BorderRadius.circular(8),
-                                                          boxShadow: [
-                                                            BoxShadow(
-                                                              color: Colors.black.withOpacity(0.2),
-                                                              blurRadius: 4,
-                                                              offset: const Offset(0, 2),
-                                                            )
-                                                          ],
+                                                          color: isPositive ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE), // Pastel
+                                                          borderRadius: BorderRadius.circular(20), // Cápsula
                                                         ),
                                                         child: Text(
                                                           product.yieldAmount > 1 
                                                               ? 'LUCRO: R\$ ${profitPerUnit.toStringAsFixed(2)} / ${product.unit}'
                                                               : 'LUCRO: R\$ ${profit.toStringAsFixed(2)}',
-                                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                          style: TextStyle(
+                                                            color: isPositive ? const Color(0xFF2E7D32) : const Color(0xFFC62828), 
+                                                            fontSize: 9, 
+                                                            fontWeight: FontWeight.bold,
+                                                            letterSpacing: 0.5,
+                                                          ),
                                                         ),
                                                       );
                                                     }

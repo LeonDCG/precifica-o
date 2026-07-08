@@ -7,6 +7,8 @@ import 'screens/login_screen.dart'; // Import the new LoginScreen
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/db_helper.dart';
 
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -19,6 +21,15 @@ void main() async {
     );
     
     await DatabaseHelper.instance.seedData(); // Popula os dados iniciais se vazio!
+    
+    // Carregar preferência de tema
+    final themeStr = await DatabaseHelper.instance.getSetting('themeMode');
+    if (themeStr == 'dark') {
+      themeNotifier.value = ThemeMode.dark;
+    } else {
+      themeNotifier.value = ThemeMode.light;
+    }
+    
     runApp(const PrecificacaoApp());
   } catch (e, stack) {
     runApp(MaterialApp(
@@ -46,11 +57,18 @@ class PrecificacaoApp extends StatelessWidget {
     // Check if the user is already logged in
     final session = Supabase.instance.client.auth.currentSession;
     
-    return MaterialApp(
-      title: 'Doce & Ponto',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: session != null ? const HomeScreen() : const LoginScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, currentThemeMode, __) {
+        return MaterialApp(
+          title: 'Doce & Ponto',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentThemeMode,
+          home: session != null ? const HomeScreen() : const LoginScreen(),
+        );
+      },
     );
   }
 }

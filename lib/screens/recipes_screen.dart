@@ -38,6 +38,24 @@ class _RecipesScreenState extends State<RecipesScreen> {
     return grouped;
   }
 
+  Color _getCategoryColor(String category) {
+    final cat = category.toLowerCase().trim();
+    if (cat.contains('bolo') || cat.contains('massa')) {
+      return const Color(0xFFFFB74D); // Laranja / Âmbar
+    } else if (cat.contains('recheio') || cat.contains('cobertura') || cat.contains('doce')) {
+      return const Color(0xFFE57373); // Vermelho / Rosa
+    } else if (cat.contains('embalagem') || cat.contains('torta')) {
+      return const Color(0xFF64B5F6); // Azul
+    }
+    // Fallback: cor pastel consistente gerada pelo texto
+    final int hash = cat.hashCode;
+    // Criar cor pastel a partir de um hash
+    final r = (hash & 0xFF0000) >> 16;
+    final g = (hash & 0x00FF00) >> 8;
+    final b = (hash & 0x0000FF);
+    return Color.fromARGB(255, (r % 100) + 120, (g % 100) + 120, (b % 100) + 120);
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupedRecipes = _getGroupedRecipes();
@@ -99,90 +117,101 @@ class _RecipesScreenState extends State<RecipesScreen> {
                             final categoryRecipes = groupedRecipes[category]!;
                             final isCollapsed = _collapsedCategories.contains(category);
 
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                InkWell(
-                                  onTap: () {
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                              ),
+                              child: Theme(
+                                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                                child: ExpansionTile(
+                                  initiallyExpanded: !isCollapsed,
+                                  onExpansionChanged: (expanded) {
                                     setState(() {
-                                      if (isCollapsed) {
+                                      if (expanded) {
                                         _collapsedCategories.remove(category);
                                       } else {
                                         _collapsedCategories.add(category);
                                       }
                                     });
                                   },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 12.0),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          '${category.toUpperCase()} (${categoryRecipes.length})',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 1.2,
-                                            color: Theme.of(context).colorScheme.primary,
-                                          ),
-                                        ),
-                                        Icon(
-                                          isCollapsed ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_down,
-                                          color: Theme.of(context).colorScheme.primary,
-                                        ),
-                                      ],
+                                  title: Text(
+                                    category.isEmpty ? 'SEM CATEGORIA' : category.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.2,
+                                      color: Theme.of(context).colorScheme.primary,
                                     ),
                                   ),
-                                ),
-                                if (!isCollapsed)
-                                 ...categoryRecipes.map((recipe) {
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    elevation: 1,
-                                    child: ListTile(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                      onTap: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(builder: (context) => AddRecipeScreen(recipe: recipe)),
-                                        );
-                                        _refreshRecipes();
-                                      },
-                                      title: Text(
-                                        recipe.name,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                      ),
-                                      subtitle: Text(
-                                        'Rende: ${recipe.yieldAmount} ${recipe.yieldUnit}  •  Custo: R\$ ${recipe.totalCost.toStringAsFixed(2)}',
-                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                      ),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            'R\$ ${recipe.costPerYield.toStringAsFixed(2)} / ${recipe.yieldUnit}',
-                                            style: TextStyle(
-                                              color: Theme.of(context).colorScheme.secondary,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
+                                  leading: Icon(Icons.folder_open_outlined, color: Theme.of(context).primaryColor, size: 20),
+                                  childrenPadding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
+                                  children: categoryRecipes.map((recipe) {
+                                    final stripeColor = _getCategoryColor(category);
+                                    return Card(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      elevation: 0.5,
+                                      clipBehavior: Clip.antiAlias,
+                                      child: IntrinsicHeight(
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            Container(
+                                              width: 5,
+                                              color: stripeColor,
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          IconButton(
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                            onPressed: () async {
-                                              await DatabaseHelper.instance.deleteRecipe(recipe.id!);
-                                              _refreshRecipes();
-                                            },
-                                          ),
-                                        ],
+                                            Expanded(
+                                              child: ListTile(
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                                onTap: () async {
+                                                  await Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(builder: (context) => AddRecipeScreen(recipe: recipe)),
+                                                  );
+                                                  _refreshRecipes();
+                                                },
+                                                title: Text(
+                                                  recipe.name,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                                ),
+                                                subtitle: Text(
+                                                  'Rende: ${recipe.yieldAmount} ${recipe.yieldUnit}  •  Custo: R\$ ${recipe.totalCost.toStringAsFixed(2)}',
+                                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                                ),
+                                                trailing: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      'R\$ ${recipe.costPerYield.toStringAsFixed(2)} / ${recipe.yieldUnit}',
+                                                      style: TextStyle(
+                                                        color: Theme.of(context).colorScheme.secondary,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    IconButton(
+                                                      padding: EdgeInsets.zero,
+                                                      constraints: const BoxConstraints(),
+                                                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                                      onPressed: () async {
+                                                        await DatabaseHelper.instance.deleteRecipe(recipe.id!);
+                                                        _refreshRecipes();
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ],
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
                             );
                           },
                         ),

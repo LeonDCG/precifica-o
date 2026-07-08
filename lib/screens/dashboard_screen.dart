@@ -1,8 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../database/db_helper.dart';
 import '../models/product.dart';
 import 'login_screen.dart';
+import 'add_recipe_screen.dart';
+import 'add_product_screen.dart';
+import 'add_sale_screen.dart';
+import '../main.dart'; // Para acessar o themeNotifier
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -16,6 +22,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _desiredSalary = 2000.0;
   double _workedHoursPerMonth = 160.0;
   List<Product> _products = [];
+  double _monthlyTarget = 0.0;
+  double _monthlyNetProfit = 0.0;
 
   double get _hourlyRate => _workedHoursPerMonth > 0 ? _desiredSalary / _workedHoursPerMonth : 0.0;
 
@@ -30,11 +38,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     
     final salaryStr = await DatabaseHelper.instance.getSetting('desiredSalary');
     final hoursStr = await DatabaseHelper.instance.getSetting('workedHoursPerMonth');
+    final targetStr = await DatabaseHelper.instance.getSetting('salesTarget');
     
     if (salaryStr != null) _desiredSalary = double.tryParse(salaryStr) ?? 2000.0;
     if (hoursStr != null) _workedHoursPerMonth = double.tryParse(hoursStr) ?? 160.0;
+    if (targetStr != null) _monthlyTarget = double.tryParse(targetStr) ?? 0.0;
     
     _products = await DatabaseHelper.instance.readAllProducts();
+
+    // Calcular Lucro Mensal Real
+    final sales = await DatabaseHelper.instance.readAllSales();
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    
+    double monthlyProfitSum = 0.0;
+    for (var s in sales) {
+      final sDate = DateTime(s.saleDate.year, s.saleDate.month, s.saleDate.day);
+      if (sDate.compareTo(monthStart) >= 0) {
+        monthlyProfitSum += s.netProfit;
+      }
+    }
+    _monthlyNetProfit = monthlyProfitSum;
     
     setState(() => _isLoading = false);
   }
@@ -93,14 +117,158 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Bom dia! 🍰';
+    } else if (hour < 18) {
+      return 'Boa tarde! 🍰';
+    } else {
+      return 'Boa noite! 🍰';
+    }
+  }
+
+  Widget _buildCircularProgressRing() {
+    final progress = _monthlyTarget > 0 ? (_monthlyNetProfit / _monthlyTarget).clamp(0.0, 1.0) : 0.0;
+    final percent = (progress * 100).toStringAsFixed(0);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2B2724) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: isDark ? [] : [
+          BoxShadow(
+            color: Colors.brown.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03)),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 76,
+                height: 76,
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 8,
+                  backgroundColor: isDark ? Colors.white12 : Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.secondary,
+                  ),
+                ),
+              ),
+              Text(
+                '$percent%',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'LUCRO DESTE MÊS',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white60 : Colors.grey[600],
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'R\$ ${_monthlyNetProfit.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _monthlyTarget > 0 
+                      ? 'Meta: R\$ ${_monthlyTarget.toStringAsFixed(0)}'
+                      : 'Nenhuma meta de lucro definida.',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionCard(BuildContext context, String label, IconData icon, Color color, Widget screen) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Card(
+      elevation: 0,
+      color: isDark ? const Color(0xFF37312C) : color.withOpacity(0.06),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: isDark ? Colors.white.withOpacity(0.05) : color.withOpacity(0.1)),
+      ),
+      child: InkWell(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => screen),
+          );
+          _loadData();
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: isDark ? Theme.of(context).colorScheme.secondary : color, size: 28),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Doce & Ponto', style: TextStyle(fontSize: 18)),
+        title: Text('Doce & Ponto', style: GoogleFonts.merriweather(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
+          // Botão Chaveador Modo Escuro
+          IconButton(
+            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: isDark ? Colors.yellow : Colors.black),
+            tooltip: isDark ? 'Modo Claro' : 'Modo Escuro',
+            onPressed: () async {
+              final newMode = isDark ? ThemeMode.light : ThemeMode.dark;
+              await DatabaseHelper.instance.saveSetting('themeMode', isDark ? 'light' : 'dark');
+              themeNotifier.value = newMode;
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sair',
@@ -117,41 +285,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       body: SingleChildScrollView(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.only(top: 16, bottom: 32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(36),
-                  bottomRight: Radius.circular(36),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.brown.withOpacity(0.08),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  )
-                ]
-              ),
-              child: Center(
-                child: Image.asset(
-                  'assets/images/logo_light_v3.png',
-                  height: 180,
-                ),
+            // Header Saudação Personalizada
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
+                    child: const Icon(Icons.person, color: Colors.brown, size: 28),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _getGreeting(),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                      const Text(
+                        'Doce & Ponto Confeitaria',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
+
+            // Card Progresso Circular
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: _buildCircularProgressRing(),
+            ),
+
+            // Atalhos Rápidos
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 8),
-                  Text('Resumo financeiro e configurações globais.', style: Theme.of(context).textTheme.bodySmall),
-                  const SizedBox(height: 24),
-                  
+                  Text('Ações Rápidas', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1.3,
+                    children: [
+                      _buildQuickActionCard(
+                        context,
+                        'Registrar Venda',
+                        Icons.add_shopping_cart,
+                        Colors.green,
+                        const AddSaleScreen(),
+                      ),
+                      _buildQuickActionCard(
+                        context,
+                        'Nova Receita',
+                        Icons.restaurant_menu,
+                        Colors.blue,
+                        const AddRecipeScreen(),
+                      ),
+                      _buildQuickActionCard(
+                        context,
+                        'Novo Produto',
+                        Icons.cake,
+                        Colors.purple,
+                        const AddProductScreen(),
+                      ),
+                      _buildQuickActionCard(
+                        context,
+                        'Meta Mensal',
+                        Icons.flag,
+                        Colors.orange,
+                        const Scaffold(body: Center(child: Text('Use a aba de Vendas para definir a meta.'))), // link
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   // Cartão de Mão de Obra
                   Card(
                     elevation: 4,
@@ -212,7 +436,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text('Resumo do Catálogo', style: Theme.of(context).textTheme.titleLarge),
@@ -225,9 +449,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark ? const Color(0xFF2B2724) : Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.brown.withOpacity(0.1)),
+                            border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.brown.withOpacity(0.1)),
                           ),
                           child: Column(
                             children: [
@@ -258,7 +482,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     ],
-                  )
+                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),

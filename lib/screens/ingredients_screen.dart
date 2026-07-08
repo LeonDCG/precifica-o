@@ -168,40 +168,61 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
   }
 
   Widget _buildItemCard(Ingredient item) {
+    Color stripeColor = const Color(0xFF81C784); // Default: Verde
+    if (item.type == 'packaging') {
+      stripeColor = const Color(0xFF64B5F6); // Azul
+    } else if (item.type == 'operational') {
+      stripeColor = const Color(0xFFFFB74D); // Laranja
+    }
+
     return Card(
       elevation: 1,
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        onTap: () => _showAddIngredientSheet(ingredient: item),
-        title: Text(
-          item.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        subtitle: Text(
-          'Comprou: ${item.quantity}${item.unit} por R\$ ${item.price.toStringAsFixed(2)}',
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'R\$ ${item.unitPrice.toStringAsFixed(2)} / ${item.unit}',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.secondary,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
+            Container(
+              width: 5,
+              color: stripeColor,
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-              onPressed: () async {
-                await DatabaseHelper.instance.deleteIngredient(item.id!);
-                _refreshIngredients();
-              },
+            Expanded(
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                onTap: () => _showAddIngredientSheet(ingredient: item),
+                title: Text(
+                  item.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                subtitle: Text(
+                  'Comprou: ${item.quantity}${item.unit} por R\$ ${item.price.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'R\$ ${item.unitPrice.toStringAsFixed(2)} / ${item.unit}',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.secondary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                      onPressed: () async {
+                        await DatabaseHelper.instance.deleteIngredient(item.id!);
+                        _refreshIngredients();
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
