@@ -14,7 +14,7 @@ class RecipesScreen extends StatefulWidget {
 class _RecipesScreenState extends State<RecipesScreen> {
   List<Recipe> _recipes = [];
   bool _isLoading = true;
-  final Set<String> _collapsedCategories = {};
+  final Set<String> _expandedCategories = {};
 
   @override
   void initState() {
@@ -115,7 +115,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
                           itemBuilder: (context, catIndex) {
                             final category = groupedRecipes.keys.elementAt(catIndex);
                             final categoryRecipes = groupedRecipes[category]!;
-                            final isCollapsed = _collapsedCategories.contains(category);
+                            final isExpanded = _expandedCategories.contains(category);
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -127,13 +127,13 @@ class _RecipesScreenState extends State<RecipesScreen> {
                               child: Theme(
                                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                                 child: ExpansionTile(
-                                  initiallyExpanded: !isCollapsed,
+                                  initiallyExpanded: isExpanded,
                                   onExpansionChanged: (expanded) {
                                     setState(() {
                                       if (expanded) {
-                                        _collapsedCategories.remove(category);
+                                        _expandedCategories.add(category);
                                       } else {
-                                        _collapsedCategories.add(category);
+                                        _expandedCategories.remove(category);
                                       }
                                     });
                                   },
