@@ -23,9 +23,17 @@ class _RecipesScreenState extends State<RecipesScreen> {
   }
 
   Future<void> _refreshRecipes() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
-    _recipes = await DatabaseHelper.instance.readAllRecipes();
-    setState(() => _isLoading = false);
+    try {
+      _recipes = await DatabaseHelper.instance.readAllRecipes();
+    } catch (e) {
+      debugPrint('Erro ao carregar receitas: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Map<String, List<Recipe>> _getGroupedRecipes() {

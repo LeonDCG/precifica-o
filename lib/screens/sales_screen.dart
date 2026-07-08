@@ -70,12 +70,22 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   Future<void> _refreshSales() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
-    final salesData = await DatabaseHelper.instance.readAllSales();
-    setState(() {
-      _sales = salesData;
-      _isLoading = false;
-    });
+    try {
+      final salesData = await DatabaseHelper.instance.readAllSales();
+      if (mounted) {
+        setState(() {
+          _sales = salesData;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar vendas: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   List<Sale> get _filteredSales {

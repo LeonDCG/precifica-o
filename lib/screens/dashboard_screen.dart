@@ -9,6 +9,7 @@ import 'add_recipe_screen.dart';
 import 'add_product_screen.dart';
 import 'add_sale_screen.dart';
 import '../main.dart'; // Para acessar o themeNotifier
+import 'home_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -34,33 +35,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     
-    final salaryStr = await DatabaseHelper.instance.getSetting('desiredSalary');
-    final hoursStr = await DatabaseHelper.instance.getSetting('workedHoursPerMonth');
-    final targetStr = await DatabaseHelper.instance.getSetting('salesTarget');
-    
-    if (salaryStr != null) _desiredSalary = double.tryParse(salaryStr) ?? 2000.0;
-    if (hoursStr != null) _workedHoursPerMonth = double.tryParse(hoursStr) ?? 160.0;
-    if (targetStr != null) _monthlyTarget = double.tryParse(targetStr) ?? 0.0;
-    
-    _products = await DatabaseHelper.instance.readAllProducts();
+    try {
+      final salaryStr = await DatabaseHelper.instance.getSetting('desiredSalary');
+      final hoursStr = await DatabaseHelper.instance.getSetting('workedHoursPerMonth');
+      final targetStr = await DatabaseHelper.instance.getSetting('salesTarget');
+      
+      if (salaryStr != null) _desiredSalary = double.tryParse(salaryStr) ?? 2000.0;
+      if (hoursStr != null) _workedHoursPerMonth = double.tryParse(hoursStr) ?? 160.0;
+      if (targetStr != null) _monthlyTarget = double.tryParse(targetStr) ?? 0.0;
+      
+      _products = await DatabaseHelper.instance.readAllProducts();
 
-    // Calcular Lucro Mensal Real
-    final sales = await DatabaseHelper.instance.readAllSales();
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
-    
-    double monthlyProfitSum = 0.0;
-    for (var s in sales) {
-      final sDate = DateTime(s.saleDate.year, s.saleDate.month, s.saleDate.day);
-      if (sDate.compareTo(monthStart) >= 0) {
-        monthlyProfitSum += s.netProfit;
+      // Calcular Lucro Mensal Real
+      final sales = await DatabaseHelper.instance.readAllSales();
+      final now = DateTime.now();
+      final monthStart = DateTime(now.year, now.month, 1);
+      
+      double monthlyProfitSum = 0.0;
+      for (var s in sales) {
+        final sDate = DateTime(s.saleDate.year, s.saleDate.month, s.saleDate.day);
+        if (sDate.compareTo(monthStart) >= 0) {
+          monthlyProfitSum += s.netProfit;
+        }
+      }
+      _monthlyNetProfit = monthlyProfitSum;
+    } catch (e, stack) {
+      debugPrint('Erro ao carregar dados do Dashboard: $e\n$stack');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
-    _monthlyNetProfit = monthlyProfitSum;
-    
-    setState(() => _isLoading = false);
   }
 
   Future<void> _showLaborConfigDialog() async {
@@ -208,7 +216,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildQuickActionCard(BuildContext context, String label, IconData icon, Color color, Widget screen) {
+  Widget _buildQuickActionCard(BuildContext context, String label, IconData icon, Color color, Widget? screen, {VoidCallback? onTap}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
       elevation: 0,
@@ -219,11 +227,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: InkWell(
         onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => screen),
-          );
-          _loadData();
+          if (onTap != null) {
+            onTap();
+          } else if (screen != null) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => screen),
+            );
+            _loadData();
+          }
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
@@ -363,7 +375,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Meta Mensal',
                         Icons.flag,
                         Colors.orange,
-                        const Scaffold(body: Center(child: Text('Use a aba de Vendas para definir a meta.'))), // link
+                        null,
+                        onTap: () {
+                          final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                          if (homeState != null) {
+                            homeState.setTab(4); // Switch to Vendas tab
+                          }
+                        },
                       ),
                     ],
                   ),

@@ -64,7 +64,9 @@ class Sale {
       commissionPercent: ((map['commissionpercent'] ?? 0.0) as num).toDouble(),
       commissionValue: ((map['commissionvalue'] ?? 0.0) as num).toDouble(),
       netProfit: ((map['netprofit'] ?? 0.0) as num).toDouble(),
-      saleDate: DateTime.parse(map['saledate'] ?? map['saleDate']),
+      saleDate: map['saledate'] != null
+          ? DateTime.parse(map['saledate'])
+          : (map['saleDate'] != null ? DateTime.parse(map['saleDate']) : DateTime.now()),
       notes: map['notes'] ?? '',
     );
   }

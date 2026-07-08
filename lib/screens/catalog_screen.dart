@@ -24,12 +24,22 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   Future<void> _refreshProducts() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
-    final prods = await DatabaseHelper.instance.readAllProducts();
-    setState(() {
-      _products = prods;
-      _isLoading = false;
-    });
+    try {
+      final prods = await DatabaseHelper.instance.readAllProducts();
+      if (mounted) {
+        setState(() {
+          _products = prods;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar produtos: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Map<String, List<Product>> _getGroupedProducts() {

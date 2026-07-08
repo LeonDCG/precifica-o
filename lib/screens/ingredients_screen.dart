@@ -23,9 +23,17 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
   }
 
   Future<void> _refreshIngredients() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
-    _allIngredients = await DatabaseHelper.instance.readAllIngredients();
-    setState(() => _isLoading = false);
+    try {
+      _allIngredients = await DatabaseHelper.instance.readAllIngredients();
+    } catch (e) {
+      debugPrint('Erro ao carregar insumos: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _showAddIngredientSheet({Ingredient? ingredient}) {
