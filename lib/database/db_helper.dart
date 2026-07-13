@@ -4,6 +4,8 @@ import '../models/product.dart';
 import '../models/recipe.dart';
 import '../models/sale.dart';
 import '../models/refrigerator_item.dart';
+import '../models/profile.dart';
+import '../models/order_request.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -262,6 +264,148 @@ class DatabaseHelper {
     } catch (e) {
       // Falha silenciosa para não quebrar o fluxo de salvar venda
       print('Erro ao deduzir estoque: $e');
+    }
+  }
+
+  // --- PROFILES & ROLES ---
+  Future<Profile?> getProfile(String uid) async {
+    try {
+      final response = await _client.from('profiles').select().eq('id', uid).maybeSingle();
+      if (response != null) {
+        return Profile.fromMap(response);
+      }
+    } catch (e) {
+      print('Erro ao buscar perfil: $e');
+    }
+    return null;
+  }
+
+  Future<void> createProfile(Profile profile) async {
+    try {
+      await _client.from('profiles').insert(profile.toMap());
+    } catch (e) {
+      print('Erro ao criar perfil: $e');
+    }
+  }
+
+  Future<List<Profile>> getSellers() async {
+    final response = await _client.from('profiles').select().eq('role', 'seller').order('name');
+    return response.map<Profile>((json) => Profile.fromMap(json)).toList();
+  }
+
+  // --- SELLER CONSIGNED STOCK ---
+  Future<List<Map<String, dynamic>>> getSellerStock(String sellerId) async {
+    final response = await _client
+        .from('seller_stock')
+        .select('*, products(name, unit, yieldAmount)')
+        .eq('seller_id', sellerId);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  Future<void> addSellerStock(String sellerId, int productId, double qty) async {
+    try {
+      final response = await _client
+          .from('seller_stock')
+          .select()
+          .eq('seller_id', sellerId)
+          .eq('product_id', productId)
+          .maybeSingle();
+
+      if (response != null) {
+        final currentQty = ((response['quantity'] ?? 0.0) as num).toDouble();
+        await _client
+            .from('seller_stock')
+            .update({'quantity': currentQty + qty, 'last_updated': DateTime.now().toIso8601String()})
+            .eq('seller_id', sellerId)
+            .eq('product_id', productId);
+      } else {
+        await _client.from('seller_stock').insert({
+          'seller_id': sellerId,
+          'product_id': productId,
+          'quantity': qty,
+        });
+      }
+    } catch (e) {
+      print('Erro ao adicionar estoque consignado do vendedor: $e');
+    }
+  }
+
+  Future<void> deductSellerStock(String sellerId, int productId, double qty, {double yieldAmount = 1.0, bool isSliceSale = false}) async {
+    try {
+      final response = await _client
+          .from('seller_stock')
+          .select('*, products(unit)')
+          .eq('seller_id', sellerId)
+          .eq('product_id', productId)
+          .maybeSingle();
+
+      if (response != null) {
+        final currentQty = ((response['quantity'] ?? 0.0) as num).toDouble();
+        double finalDeduct = qty;
+        final productUnit = response['products']?['unit']?.toString().toLowerCase() ?? 'unidade';
+        if (isSliceSale && yieldAmount > 1 && productUnit == 'unidade') {
+          finalDeduct = qty / yieldAmount;
+        }
+        final newQty = (currentQty - finalDeduct).clamp(0.0, double.infinity);
+        await _client
+            .from('seller_stock')
+            .update({'quantity': newQty, 'last_updated': DateTime.now().toIso8601String()})
+            .eq('seller_id', sellerId)
+            .eq('product_id', productId);
+      }
+    } catch (e) {
+      print('Erro ao deduzir estoque consignado do vendedor: $e');
+    }
+  }
+
+  // --- ORDER REQUESTS ---
+  Future<void> createOrderRequest(OrderRequest req) async {
+    var data = req.toMap();
+    data.remove('id');
+    await _client.from('order_requests').insert(data);
+  }
+
+  Future<List<OrderRequest>> getSellerOrderRequests(String sellerId) async {
+    final response = await _client
+        .from('order_requests')
+        .select('*, products(name)')
+        .eq('seller_id', sellerId)
+        .order('created_at', ascending: false);
+    return response.map<OrderRequest>((json) => OrderRequest.fromMap(json)).toList();
+  }
+
+  Future<List<OrderRequest>> getAllOrderRequests() async {
+    final response = await _client
+        .from('order_requests')
+        .select('*, products(name), profiles(name)')
+        .order('created_at', ascending: false);
+    return response.map<OrderRequest>((json) => OrderRequest.fromMap(json)).toList();
+  }
+
+  Future<void> updateOrderRequestStatus(int id, String status) async {
+    await _client.from('order_requests').update({'status': status}).eq('id', id);
+  }
+
+  Future<void> deliverOrderRequest(int requestId) async {
+    try {
+      final response = await _client
+          .from('order_requests')
+          .select()
+          .eq('id', requestId)
+          .single();
+
+      if (response != null) {
+        final sellerId = response['seller_id'];
+        final productId = response['product_id'];
+        final qty = ((response['quantity'] ?? 0.0) as num).toDouble();
+
+        // 1. Atualizar status para entregue
+        await updateOrderRequestStatus(requestId, 'delivered');
+        // 2. Incrementar estoque consignado do vendedor
+        await addSellerStock(sellerId, productId, qty);
+      }
+    } catch (e) {
+      print('Erro ao entregar pedido: $e');
     }
   }
 }

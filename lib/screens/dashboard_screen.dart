@@ -11,6 +11,7 @@ import 'add_sale_screen.dart';
 import '../main.dart'; // Para acessar o themeNotifier
 import 'home_screen.dart';
 import 'refrigerator_stock_screen.dart';
+import 'admin_orders_panel_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -403,6 +404,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             homeState.setTab(1); // Switch to Insumos tab
                           }
                         },
+                      ),
+                      _buildQuickActionCard(
+                        context,
+                        'Pedidos Vendedores',
+                        Icons.pending_actions,
+                        Colors.deepOrange,
+                        const AdminOrdersPanelScreen(),
                       ),
                     ],
                   ),

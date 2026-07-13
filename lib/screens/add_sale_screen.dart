@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/product.dart';
 import '../models/sale.dart';
 import '../database/db_helper.dart';
+import '../models/profile.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddSaleScreen extends StatefulWidget {
   const AddSaleScreen({Key? key}) : super(key: key);
@@ -28,6 +30,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
   String _saleUnitType = 'unit'; // 'unit' ou 'whole'
   
   bool _isLoading = true;
+  Profile? _profile;
 
   @override
   void initState() {
@@ -37,8 +40,19 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
 
   Future<void> _loadProducts() async {
     final prods = await DatabaseHelper.instance.readAllProducts();
+    final user = Supabase.instance.client.auth.currentUser;
+    Profile? profile;
+    if (user != null) {
+      profile = await DatabaseHelper.instance.getProfile(user.id);
+    }
     setState(() {
       _products = prods;
+      _profile = profile;
+      if (_profile != null && _profile!.role == 'seller') {
+        _sellerType = 'other';
+        _sellerName = _profile!.name;
+        _commissionPercent = 10.0;
+      }
       _isLoading = false;
     });
   }
@@ -117,12 +131,22 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       );
       
       await DatabaseHelper.instance.createSale(sale);
-      await DatabaseHelper.instance.deductStockForProduct(
-        sale.productId!,
-        _quantity,
-        yieldAmount: _selectedProduct!.yieldAmount,
-        isSliceSale: _saleUnitType == 'unit',
-      );
+      if (_profile != null && _profile!.role == 'seller') {
+        await DatabaseHelper.instance.deductSellerStock(
+          _profile!.id,
+          sale.productId!,
+          _quantity,
+          yieldAmount: _selectedProduct!.yieldAmount,
+          isSliceSale: _saleUnitType == 'unit',
+        );
+      } else {
+        await DatabaseHelper.instance.deductStockForProduct(
+          sale.productId!,
+          _quantity,
+          yieldAmount: _selectedProduct!.yieldAmount,
+          isSliceSale: _saleUnitType == 'unit',
+        );
+      }
       if (mounted) Navigator.pop(context, true);
     }
   }
@@ -281,55 +305,56 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
               ),
               const SizedBox(height: 24),
               
-              // Vendedor (Quem vendeu?)
-              Text('Quem realizou a venda?', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  ChoiceChip(
-                    label: const Text('Eu Mesmo'),
-                    selected: _sellerType == 'me',
-                    onSelected: (selected) {
-                      if (selected) setState(() => _sellerType = 'me');
+              if (_profile?.role != 'seller') ...[
+                Text('Quem realizou a venda?', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Eu Mesmo'),
+                      selected: _sellerType == 'me',
+                      onSelected: (selected) {
+                        if (selected) setState(() => _sellerType = 'me');
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    ChoiceChip(
+                      label: const Text('Outra Pessoa'),
+                      selected: _sellerType == 'other',
+                      onSelected: (selected) {
+                        if (selected) setState(() => _sellerType = 'other');
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                if (_sellerType == 'other') ...[
+                  TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'Nome do Vendedor',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) => _sellerType == 'other' && v!.isEmpty ? 'Obrigatório' : null,
+                    onSaved: (v) => _sellerName = v ?? '',
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    initialValue: _commissionPercent.toString(),
+                    decoration: const InputDecoration(
+                      labelText: 'Comissão (% sobre o lucro)',
+                      border: OutlineInputBorder(),
+                      suffixText: '%',
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (v) {
+                      setState(() {
+                        _commissionPercent = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                      });
                     },
                   ),
-                  const SizedBox(width: 12),
-                  ChoiceChip(
-                    label: const Text('Outra Pessoa'),
-                    selected: _sellerType == 'other',
-                    onSelected: (selected) {
-                      if (selected) setState(() => _sellerType = 'other');
-                    },
-                  ),
+                  const SizedBox(height: 16),
                 ],
-              ),
-              const SizedBox(height: 16),
-              
-              if (_sellerType == 'other') ...[
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Nome do Vendedor',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) => _sellerType == 'other' && v!.isEmpty ? 'Obrigatório' : null,
-                  onSaved: (v) => _sellerName = v ?? '',
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  initialValue: _commissionPercent.toString(),
-                  decoration: const InputDecoration(
-                    labelText: 'Comissão (% sobre o lucro)',
-                    border: OutlineInputBorder(),
-                    suffixText: '%',
-                  ),
-                  keyboardType: TextInputType.number,
-                  onChanged: (v) {
-                    setState(() {
-                      _commissionPercent = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
               ],
               
               // Resumo Financeiro da Venda
@@ -352,39 +377,50 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                         Text('R\$ ${_totalSaleValue.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Custo Total Proporcional:'),
-                        Text('R\$ ${_totalSaleCost.toStringAsFixed(2)}', style: const TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                    const Divider(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Lucro Bruto:'),
-                        Text('R\$ ${_totalSaleProfit.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: _totalSaleProfit >= 0 ? Colors.green : Colors.red)),
-                      ],
-                    ),
-                    if (_sellerType == 'other' && _totalSaleProfit > 0) ...[
+                    if (_profile?.role == 'seller') ...[
                       const SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Comissão do Vendedor ($_commissionPercent%):'),
-                          Text('- R\$ ${_commissionValue.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                          Text('Sua Comissão (${_commissionPercent.toStringAsFixed(0)}%):'),
+                          Text('R\$ ${_commissionValue.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Custo Total Proporcional:'),
+                          Text('R\$ ${_totalSaleCost.toStringAsFixed(2)}', style: const TextStyle(color: Colors.red)),
                         ],
                       ),
                       const Divider(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Seu Lucro Líquido Real:', style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text('R\$ ${_netProfit.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 16)),
+                          const Text('Lucro Bruto:'),
+                          Text('R\$ ${_totalSaleProfit.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: _totalSaleProfit >= 0 ? Colors.green : Colors.red)),
                         ],
                       ),
+                      if (_sellerType == 'other' && _totalSaleProfit > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Comissão do Vendedor ($_commissionPercent%):'),
+                            Text('- R\$ ${_commissionValue.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Seu Lucro Líquido Real:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            Text('R\$ ${_netProfit.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 16)),
+                          ],
+                        ),
+                      ],
                     ],
                   ],
                 ),

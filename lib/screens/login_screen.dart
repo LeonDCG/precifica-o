@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
+import '../models/profile.dart';
+import '../database/db_helper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,10 +31,24 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
       );
 
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        Profile? profile = await DatabaseHelper.instance.getProfile(user.id);
+        if (profile == null) {
+          final isLeon = user.email == 'leondcg@hotmail.com';
+          profile = Profile(
+            id: user.id,
+            name: isLeon ? 'Leon' : (user.email?.split('@').first ?? 'Vendedor'),
+            role: isLeon ? 'admin' : 'seller',
+          );
+          await DatabaseHelper.instance.createProfile(profile);
+        }
+
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => HomeScreen(profile: profile!)),
+          );
+        }
       }
     } on AuthException catch (e) {
       if (mounted) {

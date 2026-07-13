@@ -3,9 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../database/db_helper.dart';
 import '../models/sale.dart';
 import 'add_sale_screen.dart';
+import '../models/profile.dart';
 
 class SalesScreen extends StatefulWidget {
-  const SalesScreen({Key? key}) : super(key: key);
+  final Profile? profile;
+  const SalesScreen({Key? key, this.profile}) : super(key: key);
 
   @override
   State<SalesScreen> createState() => _SalesScreenState();
@@ -73,7 +75,10 @@ class _SalesScreenState extends State<SalesScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final salesData = await DatabaseHelper.instance.readAllSales();
+      var salesData = await DatabaseHelper.instance.readAllSales();
+      if (widget.profile != null && widget.profile!.role == 'seller') {
+        salesData = salesData.where((s) => s.sellerName == widget.profile!.name || s.sellerName == 'Você').toList();
+      }
       if (mounted) {
         setState(() {
           _sales = salesData;
@@ -188,23 +193,31 @@ class _SalesScreenState extends State<SalesScreen> {
                         const SizedBox(height: 14),
                         Row(
                           children: [
-                            _buildMetricCard(
-                              'FATURAMENTO',
-                              'R\$ ${_totalRevenue.toStringAsFixed(2)}',
-                              Colors.blue[800]!,
+                            Expanded(
+                              child: _buildMetricCard(
+                                'FATURAMENTO',
+                                'R\$ ${_totalRevenue.toStringAsFixed(2)}',
+                                Colors.blue[800]!,
+                              ),
                             ),
                             const SizedBox(width: 8),
-                            _buildMetricCard(
-                              'COMISSÕES',
-                              'R\$ ${_totalCommission.toStringAsFixed(2)}',
-                              Colors.orange[800]!,
+                            Expanded(
+                              child: _buildMetricCard(
+                                'COMISSÕES',
+                                'R\$ ${_totalCommission.toStringAsFixed(2)}',
+                                Colors.orange[800]!,
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            _buildMetricCard(
-                              'LUCRO LÍQUIDO',
-                              'R\$ ${_totalNetProfit.toStringAsFixed(2)}',
-                              Colors.green[800]!,
-                            ),
+                            if (widget.profile?.role != 'seller') ...[
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _buildMetricCard(
+                                  'LUCRO LÍQUIDO',
+                                  'R\$ ${_totalNetProfit.toStringAsFixed(2)}',
+                                  Colors.green[800]!,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ],
