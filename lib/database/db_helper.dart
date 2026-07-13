@@ -3,6 +3,7 @@ import '../models/ingredient.dart';
 import '../models/product.dart';
 import '../models/recipe.dart';
 import '../models/sale.dart';
+import '../models/refrigerator_item.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -203,14 +204,64 @@ class DatabaseHelper {
   Future<int> deleteSale(int id) async {
     await _client.from('sales').delete().eq('id', id);
     return 1;
-  }
-
-  Future close() async {
+  }  Future close() async {
     // No-op for Supabase
   }
 
   // --- SEED DATA ---
   Future<void> seedData() async {
     // No-op - we don't seed manually since Supabase has real data
+  }
+
+  // --- REFRIGERATOR STOCK CRUD ---
+  Future<List<RefrigeratorItem>> readRefrigeratorStock() async {
+    final response = await _client.from('refrigerator_stock').select().order('name', ascending: true);
+    return response.map<RefrigeratorItem>((json) => RefrigeratorItem.fromMap(json)).toList();
+  }
+
+  Future<RefrigeratorItem> createRefrigeratorItem(RefrigeratorItem item) async {
+    var data = item.toMap();
+    data.remove('id');
+    data.remove('last_updated');
+    final response = await _client.from('refrigerator_stock').insert(data).select().single();
+    return RefrigeratorItem.fromMap(response);
+  }
+
+  Future<int> updateRefrigeratorItem(RefrigeratorItem item) async {
+    var data = item.toMap();
+    data.remove('id');
+    data.remove('last_updated');
+    await _client.from('refrigerator_stock').update(data).eq('id', item.id!);
+    return 1;
+  }
+
+  Future<int> deleteRefrigeratorItem(int id) async {
+    await _client.from('refrigerator_stock').delete().eq('id', id);
+    return 1;
+  }
+
+  Future<void> deductStockForProduct(int productId, double quantityToDeduct, {double yieldAmount = 1.0, bool isSliceSale = false}) async {
+    try {
+      final response = await _client
+          .from('refrigerator_stock')
+          .select()
+          .eq('product_id', productId)
+          .maybeSingle();
+
+      if (response != null) {
+        final item = RefrigeratorItem.fromMap(response);
+        double finalDeduct = quantityToDeduct;
+        // Se for venda de fatia e estoque estiver em unidades inteiras
+        if (isSliceSale && yieldAmount > 1 && item.unit.toLowerCase() == 'unidade') {
+          finalDeduct = quantityToDeduct / yieldAmount;
+        }
+        final newQuantity = (item.quantity - finalDeduct).clamp(0.0, double.infinity);
+        item.quantity = newQuantity;
+        await updateRefrigeratorItem(item);
+      }
+    } catch (e) {
+      // Falha silenciosa para não quebrar o fluxo de salvar venda
+      print('Erro ao deduzir estoque: $e');
+    }
   }
 }

@@ -117,6 +117,12 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       );
       
       await DatabaseHelper.instance.createSale(sale);
+      await DatabaseHelper.instance.deductStockForProduct(
+        sale.productId!,
+        _quantity,
+        yieldAmount: _selectedProduct!.yieldAmount,
+        isSliceSale: _saleUnitType == 'unit',
+      );
       if (mounted) Navigator.pop(context, true);
     }
   }

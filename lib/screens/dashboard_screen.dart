@@ -10,6 +10,7 @@ import 'add_product_screen.dart';
 import 'add_sale_screen.dart';
 import '../main.dart'; // Para acessar o themeNotifier
 import 'home_screen.dart';
+import 'refrigerator_stock_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -358,6 +359,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       _buildQuickActionCard(
                         context,
+                        'Geladeira Virtual',
+                        Icons.kitchen,
+                        Colors.teal,
+                        const RefrigeratorStockScreen(),
+                      ),
+                      _buildQuickActionCard(
+                        context,
                         'Nova Receita',
                         Icons.restaurant_menu,
                         Colors.blue,
@@ -380,6 +388,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           final homeState = context.findAncestorStateOfType<HomeScreenState>();
                           if (homeState != null) {
                             homeState.setTab(4); // Switch to Vendas tab
+                          }
+                        },
+                      ),
+                      _buildQuickActionCard(
+                        context,
+                        'Novo Insumo',
+                        Icons.inventory_2,
+                        Colors.amber,
+                        null,
+                        onTap: () {
+                          final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                          if (homeState != null) {
+                            homeState.setTab(1); // Switch to Insumos tab
                           }
                         },
                       ),
