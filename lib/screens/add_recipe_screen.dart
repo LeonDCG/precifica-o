@@ -388,9 +388,13 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
             // Modo de Preparo
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardTheme.color ?? Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.brown.withOpacity(0.1)),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withOpacity(0.05)
+                      : Colors.brown.withOpacity(0.1),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -438,9 +442,13 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color ?? Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.brown.withOpacity(0.1)),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white.withOpacity(0.05)
+              : Colors.brown.withOpacity(0.1),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

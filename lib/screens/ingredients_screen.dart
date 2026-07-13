@@ -117,12 +117,24 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       hintText: 'Buscar...',
-                      fillColor: Colors.white,
+                      fillColor: Theme.of(context).cardTheme.color ?? Colors.white,
                       filled: true,
                       contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.brown.withOpacity(0.2)),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withOpacity(0.05)
+                              : Colors.brown.withOpacity(0.2),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withOpacity(0.05)
+                              : Colors.brown.withOpacity(0.2),
+                        ),
                       ),
                     ),
                   ),
