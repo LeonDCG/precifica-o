@@ -158,158 +158,63 @@ class _SalesScreenState extends State<SalesScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Métricas Rápidas e Período
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Resumo de Vendas', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 22)),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      // Filtro de Período (ChoiceChips)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildPeriodChip('Hoje', 'day'),
-                          _buildPeriodChip('7 Dias', 'week'),
-                          _buildPeriodChip('Este Mês', 'month'),
-                          _buildPeriodChip('Tudo', 'all'),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          _buildMetricCard(
-                            'FATURAMENTO',
-                            'R\$ ${_totalRevenue.toStringAsFixed(2)}',
-                            Colors.blue[800]!,
-                          ),
-                          const SizedBox(width: 8),
-                          _buildMetricCard(
-                            'COMISSÕES',
-                            'R\$ ${_totalCommission.toStringAsFixed(2)}',
-                            Colors.orange[800]!,
-                          ),
-                          const SizedBox(width: 8),
-                          _buildMetricCard(
-                            'LUCRO LÍQUIDO',
-                            'R\$ ${_totalNetProfit.toStringAsFixed(2)}',
-                            Colors.green[800]!,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Insights do Período
-                if (list.isNotEmpty) ...[
-                  Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    elevation: 0.5,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.black.withOpacity(0.05)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.analytics_outlined, size: 16, color: Theme.of(context).primaryColor),
-                              const SizedBox(width: 6),
-                              Text(
-                                'INSIGHTS DO PERÍODO',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).primaryColor,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Volume de Vendas', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                    const SizedBox(height: 2),
-                                    Text('${list.length} transações', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Ticket Médio', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                    const SizedBox(height: 2),
-                                    Text('R\$ ${_ticketMedio.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_topProducts.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            const Divider(height: 1),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Produtos Mais Vendidos:',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey[700]),
-                            ),
-                            const SizedBox(height: 4),
-                            ..._topProducts.asMap().entries.map((entry) {
-                              final idx = entry.key + 1;
-                              final name = entry.value.key;
-                              final qty = entry.value.value;
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 2.0),
-                                child: Row(
-                                  children: [
-                                    Text('$idxº ', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor, fontSize: 11)),
-                                    Expanded(
-                                      child: Text(
-                                        name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ),
-                                    Text(
-                                      '${qty.toStringAsFixed(0)} un.',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-
-                // Card de Meta Mensal
-                if (_selectedPeriod == 'month') ...[
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Métricas Rápidas e Período
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                    child: Card(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Resumo de Vendas', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 22)),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        // Filtro de Período (ChoiceChips)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildPeriodChip('Hoje', 'day'),
+                            _buildPeriodChip('7 Dias', 'week'),
+                            _buildPeriodChip('Este Mês', 'month'),
+                            _buildPeriodChip('Tudo', 'all'),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            _buildMetricCard(
+                              'FATURAMENTO',
+                              'R\$ ${_totalRevenue.toStringAsFixed(2)}',
+                              Colors.blue[800]!,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildMetricCard(
+                              'COMISSÕES',
+                              'R\$ ${_totalCommission.toStringAsFixed(2)}',
+                              Colors.orange[800]!,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildMetricCard(
+                              'LUCRO LÍQUIDO',
+                              'R\$ ${_totalNetProfit.toStringAsFixed(2)}',
+                              Colors.green[800]!,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Insights do Período
+                  if (list.isNotEmpty) ...[
+                    Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       elevation: 0.5,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -321,130 +226,230 @@ class _SalesScreenState extends State<SalesScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.flag_outlined, size: 16, color: Theme.of(context).primaryColor),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'META DE LUCRO MENSAL',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).primaryColor,
-                                        letterSpacing: 1.0,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  icon: const Icon(Icons.edit, size: 14, color: Colors.grey),
-                                  onPressed: _showSetTargetDialog,
+                                Icon(Icons.analytics_outlined, size: 16, color: Theme.of(context).primaryColor),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'INSIGHTS DO PERÍODO',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).primaryColor,
+                                    letterSpacing: 1.0,
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            if (_monthlyTarget <= 0) ...[
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Nenhuma meta definida para este mês.',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                                  TextButton(
-                                    style: TextButton.styleFrom(
-                                      padding: EdgeInsets.zero,
-                                      minimumSize: const Size(0, 0),
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    onPressed: _showSetTargetDialog,
-                                    child: const Text('Definir Meta', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ),
-                            ] else ...[
-                              Builder(
-                                builder: (context) {
-                                  final progress = _monthlyTarget > 0 ? (_totalNetProfit / _monthlyTarget).clamp(0.0, 1.0) : 0.0;
-                                  final percent = (progress * 100).toStringAsFixed(0);
-                                  return Column(
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            'R\$ ${_totalNetProfit.toStringAsFixed(2)} de R\$ ${_monthlyTarget.toStringAsFixed(0)}',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                          ),
-                                          Text(
-                                            '$percent%',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.secondary,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: LinearProgressIndicator(
-                                          value: progress,
-                                          backgroundColor: Colors.grey[200],
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.secondary,
-                                          ),
-                                          minHeight: 8,
+                                      const Text('Volume de Vendas', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                      const SizedBox(height: 2),
+                                      Text('${list.length} transações', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Ticket Médio', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                      const SizedBox(height: 2),
+                                      Text('R\$ ${_ticketMedio.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_topProducts.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              const Divider(height: 1),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Produtos Mais Vendidos:',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey[700]),
+                              ),
+                              const SizedBox(height: 4),
+                              ..._topProducts.asMap().entries.map((entry) {
+                                final idx = entry.key + 1;
+                                final name = entry.value.key;
+                                final qty = entry.value.value;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 2.0),
+                                  child: Row(
+                                    children: [
+                                      Text('$idxº ', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor, fontSize: 11)),
+                                      Expanded(
+                                        child: Text(
+                                          name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 11),
                                         ),
                                       ),
+                                      Text(
+                                        '${qty.toStringAsFixed(0)} un.',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey),
+                                      ),
                                     ],
-                                  );
-                                },
-                              ),
+                                  ),
+                                );
+                              }),
                             ],
                           ],
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
 
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Histórico de Vendas', style: Theme.of(context).textTheme.titleLarge),
-                      FloatingActionButton.extended(
-                        onPressed: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const AddSaleScreen()),
-                          );
-                          if (result == true) {
-                            _refreshSales();
-                          }
-                        },
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Nova Venda'),
+                  // Card de Meta Mensal
+                  if (_selectedPeriod == 'month') ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                      child: Card(
+                        elevation: 0.5,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.black.withOpacity(0.05)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.flag_outlined, size: 16, color: Theme.of(context).primaryColor),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'META DE LUCRO MENSAL',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context).primaryColor,
+                                          letterSpacing: 1.0,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  IconButton(
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    icon: const Icon(Icons.edit, size: 14, color: Colors.grey),
+                                    onPressed: _showSetTargetDialog,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              if (_monthlyTarget <= 0) ...[
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Nenhuma meta definida para este mês.',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                    TextButton(
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        minimumSize: const Size(0, 0),
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      onPressed: _showSetTargetDialog,
+                                      child: const Text('Definir Meta', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                              ] else ...[
+                                Builder(
+                                  builder: (context) {
+                                    final progress = _monthlyTarget > 0 ? (_totalNetProfit / _monthlyTarget).clamp(0.0, 1.0) : 0.0;
+                                    final percent = (progress * 100).toStringAsFixed(0);
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'R\$ ${_totalNetProfit.toStringAsFixed(2)} de R\$ ${_monthlyTarget.toStringAsFixed(0)}',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                            Text(
+                                              '$percent%',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.secondary,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: LinearProgressIndicator(
+                                            value: progress,
+                                            backgroundColor: Colors.grey[200],
+                                            valueColor: AlwaysStoppedAnimation<Color>(
+                                              progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.secondary,
+                                            ),
+                                            minHeight: 8,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ),
-                    ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Histórico de Vendas', style: Theme.of(context).textTheme.titleLarge),
+                        FloatingActionButton.extended(
+                          onPressed: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const AddSaleScreen()),
+                            );
+                            if (result == true) {
+                              _refreshSales();
+                            }
+                          },
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Nova Venda'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                
-                // Lista de Vendas
-                Expanded(
-                  child: list.isEmpty
-                      ? const Center(child: Text('Nenhuma venda no período selecionado.'))
+                  const SizedBox(height: 12),
+                  
+                  // Lista de Vendas
+                  list.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32.0),
+                          child: Center(child: Text('Nenhuma venda no período selecionado.')),
+                        )
                       : ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: list.length,
                           itemBuilder: (context, index) {
@@ -506,8 +511,9 @@ class _SalesScreenState extends State<SalesScreen> {
                             );
                           },
                         ),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
     );
   }
