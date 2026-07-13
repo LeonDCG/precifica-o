@@ -71,67 +71,116 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Logo Placeholder or App Title
-              Icon(
-                Icons.lock_outline,
-                size: 80,
-                color: AppTheme.brandGold,
+              // Logo Centrada e com bordas arredondadas (Círculo)
+              Center(
+                child: Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFD4AF37), width: 2), // Borda dourada
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.05),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/logo_dark.jpg',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Text(
                 'Acesso Restrito',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppTheme.primaryDark,
+                      color: const Color(0xFFD4AF37), // Dourado
+                      fontWeight: FontWeight.bold,
                     ),
               ),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 'Faça login para continuar',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textLight,
-                    ),
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 40),
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
+                style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
                   labelText: 'E-mail',
-                  prefixIcon: Icon(Icons.email_outlined),
+                  labelStyle: TextStyle(color: Colors.white70),
+                  prefixIcon: Icon(Icons.email_outlined, color: Colors.white70),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white30),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5),
+                  ),
+                  border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
                 obscureText: true,
+                style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
                   labelText: 'Senha',
-                  prefixIcon: Icon(Icons.lock_outline),
+                  labelStyle: TextStyle(color: Colors.white70),
+                  prefixIcon: Icon(Icons.lock_outline, color: Colors.white70),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white30),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5),
+                  ),
+                  border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: _isLoading ? null : _signIn,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37), // Dourado
+                  foregroundColor: Colors.black, // Texto preto
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 child: _isLoading
                     ? const SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
                         ),
                       )
-                    : const Text('Entrar'),
+                    : const Text(
+                        'Entrar',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
               ),
             ],
           ),
