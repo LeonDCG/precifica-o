@@ -214,17 +214,19 @@ class _SalesScreenState extends State<SalesScreen> {
                         const SizedBox(height: 14),
                         Row(
                           children: [
-                            Expanded(
-                              child: _buildMetricCard(
-                                'FATURAMENTO',
-                                'R\$ ${_totalRevenue.toStringAsFixed(2)}',
-                                Colors.blue[800]!,
+                            if (widget.profile?.role != 'seller') ...[
+                              Expanded(
+                                child: _buildMetricCard(
+                                  'FATURAMENTO',
+                                  'R\$ ${_totalRevenue.toStringAsFixed(2)}',
+                                  Colors.blue[800]!,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
+                              const SizedBox(width: 8),
+                            ],
                             Expanded(
                               child: _buildMetricCard(
-                                'COMISSÕES',
+                                widget.profile?.role == 'seller' ? 'LUCRO DE SUAS VENDAS' : 'COMISSÕES',
                                 'R\$ ${_totalCommission.toStringAsFixed(2)}',
                                 Colors.orange[800]!,
                               ),
@@ -291,9 +293,17 @@ class _SalesScreenState extends State<SalesScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Ticket Médio', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                      Text(
+                                        widget.profile?.role == 'seller' ? 'Comissões no Período' : 'Ticket Médio',
+                                        style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                      ),
                                       const SizedBox(height: 2),
-                                      Text('R\$ ${_ticketMedio.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      Text(
+                                        widget.profile?.role == 'seller'
+                                            ? 'R\$ ${_totalCommission.toStringAsFixed(2)}'
+                                            : 'R\$ ${_ticketMedio.toStringAsFixed(2)}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -341,7 +351,7 @@ class _SalesScreenState extends State<SalesScreen> {
                   ],
 
                   // Card de Meta Mensal
-                  if (_selectedPeriod == 'month') ...[
+                  if (_selectedPeriod == 'month' && widget.profile?.role != 'seller') ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                       child: Card(
@@ -629,50 +639,63 @@ class _SalesScreenState extends State<SalesScreen> {
                                               ],
                                             ),
                                             
-                                            // Bottom Row: Sale metrics
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      'Qtd: ${sale.quantity.toStringAsFixed(sale.quantity % 1 == 0 ? 0 : 1)}',
-                                                      style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      'Total: R\$ ${sale.totalValue.toStringAsFixed(2)}',
-                                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                                    ),
-                                                  ],
-                                                ),
-                                                Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                                  children: [
-                                                    Text(
-                                                      'Lucro: R\$ ${sale.netProfit.toStringAsFixed(2)}',
-                                                      style: const TextStyle(
-                                                        color: Colors.greenAccent,
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 14,
-                                                      ),
-                                                    ),
-                                                    if (sale.commissionValue > 0) ...[
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        'Comissão: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
-                                                        style: const TextStyle(
-                                                          color: Colors.orangeAccent,
-                                                          fontSize: 11,
-                                                          fontWeight: FontWeight.w600,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
+                                             // Bottom Row: Sale metrics
+                                             Row(
+                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                               children: [
+                                                 Column(
+                                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                                   children: [
+                                                     Text(
+                                                       'Qtd: ${sale.quantity.toStringAsFixed(sale.quantity % 1 == 0 ? 0 : 1)}',
+                                                       style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                                     ),
+                                                     if (widget.profile?.role != 'seller') ...[
+                                                       const SizedBox(height: 2),
+                                                       Text(
+                                                         'Total: R\$ ${sale.totalValue.toStringAsFixed(2)}',
+                                                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                                       ),
+                                                     ],
+                                                   ],
+                                                 ),
+                                                 Column(
+                                                   crossAxisAlignment: CrossAxisAlignment.end,
+                                                   children: [
+                                                     if (widget.profile?.role != 'seller') ...[
+                                                       Text(
+                                                         'Lucro: R\$ ${sale.netProfit.toStringAsFixed(2)}',
+                                                         style: const TextStyle(
+                                                           color: Colors.greenAccent,
+                                                            fontWeight: FontWeight.bold,
+                                                           fontSize: 14,
+                                                         ),
+                                                       ),
+                                                       if (sale.commissionValue > 0) ...[
+                                                         const SizedBox(height: 2),
+                                                         Text(
+                                                           'Comissão: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
+                                                           style: const TextStyle(
+                                                             color: Colors.orangeAccent,
+                                                             fontSize: 11,
+                                                             fontWeight: FontWeight.w600,
+                                                           ),
+                                                         ),
+                                                       ],
+                                                     ] else ...[
+                                                       Text(
+                                                         'Comissão: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
+                                                         style: const TextStyle(
+                                                           color: Colors.greenAccent,
+                                                           fontWeight: FontWeight.bold,
+                                                           fontSize: 14,
+                                                         ),
+                                                       ),
+                                                     ],
+                                                   ],
+                                                 ),
+                                               ],
+                                             ),
                                           ],
                                         ),
                                       ),
