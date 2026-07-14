@@ -205,102 +205,125 @@ class _RefrigeratorStockScreenState extends State<RefrigeratorStockScreen> {
                                 ),
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-                                child: Row(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Indicador visual de tipo
-                                    Container(
-                                      width: 42,
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                        color: isProduct
-                                            ? Colors.teal.withOpacity(isDark ? 0.15 : 0.08)
-                                            : Colors.pink.withOpacity(isDark ? 0.15 : 0.08),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Icon(
-                                        isProduct ? Icons.cake : Icons.restaurant_menu,
-                                        color: isProduct ? Colors.teal : Colors.pink,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    
-                                    // Info
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            item.name,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 15,
-                                            ),
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Indicador visual de tipo
+                                        Container(
+                                          width: 42,
+                                          height: 42,
+                                          decoration: BoxDecoration(
+                                            color: isProduct
+                                                ? Colors.teal.withOpacity(isDark ? 0.15 : 0.08)
+                                                : Colors.pink.withOpacity(isDark ? 0.15 : 0.08),
+                                            borderRadius: BorderRadius.circular(12),
                                           ),
-                                          const SizedBox(height: 4),
-                                          Row(
+                                          child: Icon(
+                                            isProduct ? Icons.cake : Icons.restaurant_menu,
+                                            color: isProduct ? Colors.teal : Colors.pink,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        
+                                        // Info
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: isProduct
-                                                      ? Colors.teal.withOpacity(0.12)
-                                                      : Colors.pink.withOpacity(0.12),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: Text(
-                                                  isProduct ? 'Bolo/Produto' : 'Recheio/Base',
-                                                  style: TextStyle(
-                                                    fontSize: 9,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: isProduct ? Colors.teal : Colors.pink,
-                                                  ),
+                                              Text(
+                                                item.name,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
-                                              if (item.lastUpdated != null)
-                                                Text(
-                                                  'Atualizado: ${item.lastUpdated!.day}/${item.lastUpdated!.month}',
-                                                  style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                                ),
+                                              const SizedBox(height: 6),
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: isProduct
+                                                          ? Colors.teal.withOpacity(0.12)
+                                                          : Colors.pink.withOpacity(0.12),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      isProduct ? 'Bolo/Produto' : 'Recheio/Base',
+                                                      style: TextStyle(
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: isProduct ? Colors.teal : Colors.pink,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  if (item.lastUpdated != null)
+                                                    Text(
+                                                      'Atualizado: ${item.lastUpdated!.day}/${item.lastUpdated!.month}',
+                                                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                                    ),
+                                                ],
+                                              ),
                                             ],
                                           ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    // Controles de estoque
-                                    Row(
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.remove_circle_outline, size: 22),
-                                          color: Colors.brown,
-                                          onPressed: () => _adjustQuantity(item, -1.0),
                                         ),
-                                        Container(
-                                          constraints: const BoxConstraints(minWidth: 40),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            '${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)} ${item.unit}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ),
+                                        
+                                        // Deletar
                                         IconButton(
-                                          icon: const Icon(Icons.add_circle_outline, size: 22),
-                                          color: Theme.of(context).primaryColor,
-                                          onPressed: () => _adjustQuantity(item, 1.0),
+                                          constraints: const BoxConstraints(),
+                                          padding: EdgeInsets.zero,
+                                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                          onPressed: () => _deleteItem(item),
                                         ),
                                       ],
                                     ),
+                                    const SizedBox(height: 12),
+                                    Divider(height: 1, color: isDark ? Colors.white.withOpacity(0.06) : Colors.brown.withOpacity(0.06)),
+                                    const SizedBox(height: 12),
                                     
-                                    // Deletar
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                      onPressed: () => _deleteItem(item),
+                                    // Controles de estoque
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Quantidade no refrigerador:',
+                                          style: TextStyle(
+                                            color: isDark ? Colors.white60 : Colors.grey[600],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        Row(
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.remove_circle_outline, size: 22),
+                                              color: Colors.brown,
+                                              onPressed: () => _adjustQuantity(item, -1.0),
+                                            ),
+                                            Container(
+                                              constraints: const BoxConstraints(minWidth: 40),
+                                              alignment: Alignment.center,
+                                              child: Text(
+                                                '${item.quantity.toStringAsFixed(item.quantity % 1 == 0 ? 0 : 1)} ${item.unit}',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.add_circle_outline, size: 22),
+                                              color: Theme.of(context).primaryColor,
+                                              onPressed: () => _adjustQuantity(item, 1.0),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
