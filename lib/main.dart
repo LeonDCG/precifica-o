@@ -16,8 +16,8 @@ void main() async {
     await initializeDateFormatting('pt_BR', null);
     
     await Supabase.initialize(
-      url: 'https://jfpswioaikpflvjiylqa.supabase.co',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmcHN3aW9haWtwZmx2aml5bHFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMzA3ODQsImV4cCI6MjA5NDkwNjc4NH0.lZmckQNXdD99KAWpdYoY9Eb5rRdcmVzQh9S67rXXPdM',
+      url: DatabaseHelper.supabaseUrl,
+      anonKey: DatabaseHelper.supabaseAnonKey,
     );
     
     await DatabaseHelper.instance.seedData(); // Popula os dados iniciais se vazio!

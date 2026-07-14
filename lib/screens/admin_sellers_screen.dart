@@ -60,9 +60,10 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
       final password = _passwordController.text;
 
       // Usando cliente temporário para não deslogar o Admin
-      final url = Supabase.instance.client.supabaseUrl;
-      final anonKey = Supabase.instance.client.supabaseKey;
-      final tempClient = SupabaseClient(url, anonKey);
+      final tempClient = SupabaseClient(
+        DatabaseHelper.supabaseUrl,
+        DatabaseHelper.supabaseAnonKey,
+      );
 
       final authResponse = await tempClient.auth.signUp(
         email: email,

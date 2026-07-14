@@ -8,6 +8,9 @@ import '../models/profile.dart';
 import '../models/order_request.dart';
 
 class DatabaseHelper {
+  static const String supabaseUrl = 'https://jfpswioaikpflvjiylqa.supabase.co';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmcHN3aW9haWtwZmx2aml5bHFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMzA3ODQsImV4cCI6MjA5NDkwNjc4NH0.lZmckQNXdD99KAWpdYoY9Eb5rRdcmVzQh9S67rXXPdM';
+
   static final DatabaseHelper instance = DatabaseHelper._init();
   
   DatabaseHelper._init();
