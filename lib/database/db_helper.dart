@@ -296,6 +296,14 @@ class DatabaseHelper {
     return response.map<Profile>((json) => Profile.fromMap(json)).toList();
   }
 
+  Future<void> updateProfileName(String uid, String newName) async {
+    await _client.from('profiles').update({'name': newName}).eq('id', uid);
+  }
+
+  Future<void> deleteProfile(String uid) async {
+    await _client.from('profiles').delete().eq('id', uid);
+  }
+
   // --- SELLER CONSIGNED STOCK ---
   Future<List<Map<String, dynamic>>> getSellerStock(String sellerId) async {
     final response = await _client

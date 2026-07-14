@@ -198,6 +198,99 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
     );
   }
 
+  void _showEditSellerDialog(Profile seller) {
+    final editNameController = TextEditingController(text: seller.name);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Editar Nome do Vendedor', style: GoogleFonts.merriweather(fontSize: 18, fontWeight: FontWeight.bold)),
+          content: TextField(
+            controller: editNameController,
+            decoration: const InputDecoration(
+              labelText: 'Nome Completo',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newName = editNameController.text.trim();
+                if (newName.isEmpty) return;
+
+                Navigator.pop(context);
+                setState(() => _isLoading = true);
+                try {
+                  await DatabaseHelper.instance.updateProfileName(seller.id, newName);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Nome atualizado com sucesso!'), backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Erro ao atualizar nome.'), backgroundColor: AppTheme.brandRed),
+                    );
+                  }
+                } finally {
+                  _loadSellers();
+                }
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteSeller(Profile seller) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Excluir Vendedor?', style: GoogleFonts.merriweather(fontSize: 18, fontWeight: FontWeight.bold)),
+          content: Text('Tem certeza de que deseja excluir ${seller.name}? Esta ação removerá o perfil do vendedor e o estoque associado.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.brandRed, foregroundColor: Colors.white),
+              onPressed: () async {
+                Navigator.pop(context);
+                setState(() => _isLoading = true);
+                try {
+                  await DatabaseHelper.instance.deleteProfile(seller.id);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Vendedor excluído com sucesso!'), backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Erro ao excluir vendedor.'), backgroundColor: AppTheme.brandRed),
+                    );
+                  }
+                } finally {
+                  _loadSellers();
+                }
+              },
+              child: const Text('Excluir'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -228,16 +321,53 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
                           ),
                           title: Text(seller.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: const Text('Papel: Vendedor / Revendedor'),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'Ativo',
-                              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11),
-                            ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  'Ativo',
+                                  style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11),
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert),
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _showEditSellerDialog(seller);
+                                  } else if (value == 'delete') {
+                                    _confirmDeleteSeller(seller);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit_outlined, size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Editar Nome'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Excluir', style: TextStyle(color: Colors.red)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       );
