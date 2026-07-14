@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../database/db_helper.dart';
@@ -18,6 +19,7 @@ class _SalesScreenState extends State<SalesScreen> {
   bool _isLoading = true;
   String _selectedPeriod = 'month'; // 'day', 'week', 'month', 'all'
   double _monthlyTarget = 0.0;
+  Map<int, String> _productImages = {};
 
   @override
   void initState() {
@@ -76,12 +78,20 @@ class _SalesScreenState extends State<SalesScreen> {
     setState(() => _isLoading = true);
     try {
       var salesData = await DatabaseHelper.instance.readAllSales();
+      final products = await DatabaseHelper.instance.readAllProducts();
+      final Map<int, String> images = {};
+      for (var p in products) {
+        if (p.id != null && p.imagePath.isNotEmpty) {
+          images[p.id!] = p.imagePath;
+        }
+      }
       if (widget.profile != null && widget.profile!.role == 'seller') {
         salesData = salesData.where((s) => s.sellerName == widget.profile!.name || s.sellerName == 'Você').toList();
       }
       if (mounted) {
         setState(() {
           _sales = salesData;
+          _productImages = images;
         });
       }
     } catch (e) {
@@ -91,6 +101,17 @@ class _SalesScreenState extends State<SalesScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  String _getPlaceholderImage(int index) {
+    final urls = [
+      'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1550617931-e17a7b70dce2?auto=format&fit=crop&w=800&q=80',
+    ];
+    return urls[index % urls.length];
   }
 
   List<Sale> get _filteredSales {
@@ -468,57 +489,195 @@ class _SalesScreenState extends State<SalesScreen> {
                           itemBuilder: (context, index) {
                             final sale = list[index];
                             final formattedDate = '${sale.saleDate.day}/${sale.saleDate.month}/${sale.saleDate.year}';
-                            
+                                       final imageUrl = _productImages[sale.productId] ?? _getPlaceholderImage(sale.productId ?? index);
+                            final isSellerSale = sale.sellerType == 'other' || (sale.sellerName.isNotEmpty && sale.sellerName != 'Você');
+
                             return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              elevation: 1,
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                title: Text(
-                                  sale.productName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Container(
+                                height: 130,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                subtitle: Text(
-                                  'Data: $formattedDate  •  Vendedor: ${sale.sellerName}\nQtd: ${sale.quantity.toStringAsFixed(0)}  •  Faturamento: R\$ ${sale.totalValue.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                ),
-                                isThreeLine: true,
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          'Lucro: R\$ ${sale.netProfit.toStringAsFixed(2)}',
-                                          style: const TextStyle(
-                                            color: Colors.green,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Stack(
+                                    children: [
+                                      // Background Image
+                                      Positioned.fill(
+                                        child: imageUrl.startsWith('data:')
+                                            ? Image.memory(
+                                                base64Decode(imageUrl.split(',').last),
+                                                fit: BoxFit.cover,
+                                              )
+                                            : Image.network(
+                                                imageUrl,
+                                                fit: BoxFit.cover,
+                                              ),
+                                      ),
+                                      // Dark overlay
+                                      Positioned.fill(
+                                        child: Container(
+                                          color: Colors.black.withOpacity(0.65),
                                         ),
-                                        if (sale.commissionValue > 0)
-                                          Text(
-                                            'Comissão: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
-                                            style: const TextStyle(
-                                              color: Colors.orange,
-                                              fontSize: 10,
+                                      ),
+                                      
+                                      // Content
+                                      Padding(
+                                        padding: const EdgeInsets.all(16.0),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            // Top Row: Product Name & Badges + Delete
+                                            Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        sale.productName,
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 16,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        'Data: $formattedDate',
+                                                        style: const TextStyle(
+                                                          color: Colors.white70,
+                                                          fontSize: 11,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                
+                                                // Badges + Delete
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    if (isSellerSale)
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFD4AF37), // Dourado
+                                                          borderRadius: BorderRadius.circular(20),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            const Icon(Icons.store, color: Colors.black, size: 12),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              sale.sellerName.toUpperCase(),
+                                                              style: const TextStyle(
+                                                                color: Colors.black,
+                                                                fontSize: 9,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      )
+                                                    else
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.teal.withOpacity(0.85),
+                                                          borderRadius: BorderRadius.circular(20),
+                                                        ),
+                                                        child: const Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(Icons.person, color: Colors.white, size: 12),
+                                                            SizedBox(width: 4),
+                                                            Text(
+                                                              'VENDA DIRETA',
+                                                              style: TextStyle(
+                                                                color: Colors.white,
+                                                                fontSize: 9,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    const SizedBox(width: 8),
+                                                    IconButton(
+                                                      constraints: const BoxConstraints(),
+                                                      padding: EdgeInsets.zero,
+                                                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                                      onPressed: () async {
+                                                        await DatabaseHelper.instance.deleteSale(sale.id!);
+                                                        _refreshSales();
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
                                             ),
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(width: 12),
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                      onPressed: () async {
-                                        await DatabaseHelper.instance.deleteSale(sale.id!);
-                                        _refreshSales();
-                                      },
-                                    ),
-                                  ],
+                                            
+                                            // Bottom Row: Sale metrics
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'Qtd: ${sale.quantity.toStringAsFixed(sale.quantity % 1 == 0 ? 0 : 1)}',
+                                                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      'Total: R\$ ${sale.totalValue.toStringAsFixed(2)}',
+                                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                                    ),
+                                                  ],
+                                                ),
+                                                Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                                  children: [
+                                                    Text(
+                                                      'Lucro: R\$ ${sale.netProfit.toStringAsFixed(2)}',
+                                                      style: const TextStyle(
+                                                        color: Colors.greenAccent,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                    if (sale.commissionValue > 0) ...[
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        'Comissão: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
+                                                        style: const TextStyle(
+                                                          color: Colors.orangeAccent,
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
