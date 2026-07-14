@@ -51,7 +51,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
       double commissionSum = 0.0;
 
       for (var s in sales) {
-        if (s.sellerName == widget.profile.name || s.sellerName == 'Você') {
+        if (s.sellerName == widget.profile.name) {
           filteredSales.add(s);
           commissionSum += s.commissionValue;
         }

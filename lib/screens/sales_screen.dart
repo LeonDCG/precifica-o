@@ -86,7 +86,7 @@ class _SalesScreenState extends State<SalesScreen> {
         }
       }
       if (widget.profile != null && widget.profile!.role == 'seller') {
-        salesData = salesData.where((s) => s.sellerName == widget.profile!.name || s.sellerName == 'Você').toList();
+        salesData = salesData.where((s) => s.sellerName == widget.profile!.name).toList();
       }
       if (mounted) {
         setState(() {
