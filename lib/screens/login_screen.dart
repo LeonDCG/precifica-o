@@ -15,9 +15,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
   bool _isLoading = false;
-  bool _isSignUp = false;
 
   Future<void> _signIn() async {
     setState(() {
@@ -79,73 +77,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _signUp() async {
-    final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, informe seu nome.'), backgroundColor: AppTheme.brandRed),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final response = await Supabase.instance.client.auth.signUp(
-        email: email,
-        password: password,
-      );
-
-      final user = response.user;
-      if (user != null) {
-        final isLeon = email == 'leondcg@hotmail.com';
-        final profile = Profile(
-          id: user.id,
-          name: name,
-          role: isLeon ? 'admin' : 'seller',
-        );
-        await DatabaseHelper.instance.createProfile(profile);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Conta criada com sucesso! Faça login para continuar.'), backgroundColor: Colors.green),
-          );
-          setState(() {
-            _isSignUp = false;
-          });
-        }
-      }
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: AppTheme.brandRed),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ocorreu um erro inesperado.'), backgroundColor: AppTheme.brandRed),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
@@ -186,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 32),
               Text(
-                _isSignUp ? 'Cadastro de Vendedor' : 'Acesso Restrito',
+                'Acesso Restrito',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: const Color(0xFFD4AF37), // Dourado
@@ -194,36 +129,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
               ),
               const SizedBox(height: 8),
-              Text(
-                _isSignUp ? 'Crie sua conta para começar a vender' : 'Faça login para continuar',
+              const Text(
+                'Faça login para continuar',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(height: 40),
-              
-              if (_isSignUp) ...[
-                TextField(
-                  controller: _nameController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Nome Completo',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    prefixIcon: Icon(Icons.person_outline, color: Colors.white70),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white30),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFFD4AF37), width: 1.5),
-                    ),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -261,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: _isLoading ? null : (_isSignUp ? _signUp : _signIn),
+                onPressed: _isLoading ? null : _signIn,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFD4AF37), // Dourado
                   foregroundColor: Colors.black, // Texto preto
@@ -279,22 +193,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
                         ),
                       )
-                    : Text(
-                        _isSignUp ? 'Cadastrar' : 'Entrar',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    : const Text(
+                        'Entrar',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _isSignUp = !_isSignUp;
-                  });
-                },
-                child: Text(
-                  _isSignUp ? 'Já tem uma conta? Faça Login' : 'Quero me cadastrar como Vendedor',
-                  style: const TextStyle(color: Color(0xFFD4AF37)),
-                ),
               ),
             ],
           ),
