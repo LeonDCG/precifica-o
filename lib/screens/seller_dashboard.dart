@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/profile.dart';
+import '../models/sale.dart';
 import '../database/db_helper.dart';
-import 'add_sale_screen.dart';
 import 'login_screen.dart';
 
 class SellerDashboard extends StatefulWidget {
@@ -17,7 +18,8 @@ class SellerDashboard extends StatefulWidget {
 class _SellerDashboardState extends State<SellerDashboard> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _consignedStock = [];
-  double _monthlySalesRevenue = 0.0;
+  List<Sale> _sellerSales = [];
+  Map<int, String> _productImages = {};
   double _monthlyCommission = 0.0;
 
   @override
@@ -34,25 +36,30 @@ class _SellerDashboardState extends State<SellerDashboard> {
       // 1. Carrega estoque consignado
       _consignedStock = await DatabaseHelper.instance.getSellerStock(widget.profile.id);
 
-      // 2. Calcula receitas e comissões do mês
-      final sales = await DatabaseHelper.instance.readAllSales();
-      final now = DateTime.now();
+      // 2. Carrega todos os produtos para as imagens
+      final products = await DatabaseHelper.instance.readAllProducts();
+      final Map<int, String> images = {};
+      for (var p in products) {
+        if (p.id != null && p.imagePath.isNotEmpty) {
+          images[p.id!] = p.imagePath;
+        }
+      }
 
-      double revenueSum = 0.0;
+      // 3. Calcula comissões e filtra vendas do vendedor
+      final sales = await DatabaseHelper.instance.readAllSales();
+      final List<Sale> filteredSales = [];
       double commissionSum = 0.0;
 
       for (var s in sales) {
-        if (s.sellerName == widget.profile.name || s.sellerName == 'Você') { // Tratamento para quando é o próprio vendedor
-          final sDate = s.saleDate;
-          if (sDate.year == now.year && sDate.month == now.month) {
-            revenueSum += s.totalValue;
-            commissionSum += s.commissionValue;
-          }
+        if (s.sellerName == widget.profile.name || s.sellerName == 'Você') {
+          filteredSales.add(s);
+          commissionSum += s.commissionValue;
         }
       }
 
       setState(() {
-        _monthlySalesRevenue = revenueSum;
+        _sellerSales = filteredSales;
+        _productImages = images;
         _monthlyCommission = commissionSum;
       });
     } catch (e) {
@@ -73,13 +80,24 @@ class _SellerDashboardState extends State<SellerDashboard> {
     }
   }
 
+  String _getPlaceholderImage(int index) {
+    final urls = [
+      'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1550617931-e17a7b70dce2?auto=format&fit=crop&w=800&q=80',
+    ];
+    return urls[index % urls.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Painel de Vendas', style: GoogleFonts.merriweather(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text('Painel do Vendedor', style: GoogleFonts.merriweather(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -104,55 +122,16 @@ class _SellerDashboardState extends State<SellerDashboard> {
                       style: GoogleFonts.merriweather(fontSize: 22, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
-                    const Text('Boas vendas hoje!', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                    const Text('Acompanhe suas vendas e estoque abaixo.', style: TextStyle(color: Colors.grey, fontSize: 14)),
                     const SizedBox(height: 20),
 
-                    // Resumo Financeiro
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildMetricCard(
-                            'VENDIDO NO MÊS',
-                            'R\$ ${_monthlySalesRevenue.toStringAsFixed(2)}',
-                            Colors.blue[800]!,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildMetricCard(
-                            'SUA COMISSÃO',
-                            'R\$ ${_monthlyCommission.toStringAsFixed(2)}',
-                            Colors.green[800]!,
-                          ),
-                        ),
-                      ],
+                    // Apenas o lucro de venda dele (Total Commission)
+                    _buildMetricCard(
+                      'LUCRO TOTAL DE SUAS VENDAS',
+                      'R\$ ${_monthlyCommission.toStringAsFixed(2)}',
+                      const Color(0xFFD4AF37), // Dourado
                     ),
-                    const SizedBox(height: 28),
-
-                    // Botão rápido para nova venda
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).primaryColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        icon: const Icon(Icons.add_shopping_cart),
-                        label: const Text('Registrar Nova Venda', style: TextStyle(fontWeight: FontWeight.bold)),
-                        onPressed: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const AddSaleScreen()),
-                          );
-                          if (result == true) {
-                            _loadData();
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 24),
 
                     // Estoque Consignado
                     Text(
@@ -176,12 +155,6 @@ class _SellerDashboardState extends State<SellerDashboard> {
                                   'Sem bolos consignados no momento.',
                                   style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Faça uma solicitação de estoque na aba Encomendar.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
                               ],
                             ),
                           )
@@ -203,7 +176,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
                                     child: Icon(Icons.cake, color: Colors.white, size: 20),
                                   ),
                                   title: Text(productName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text('Estoque disponível com você'),
+                                  subtitle: const Text('Estoque disponível com você'),
                                   trailing: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(
@@ -216,6 +189,149 @@ class _SellerDashboardState extends State<SellerDashboard> {
                                         color: qty > 0 ? Colors.teal : Colors.red,
                                         fontWeight: FontWeight.bold,
                                       ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                    const SizedBox(height: 28),
+
+                    // Cards da Venda
+                    Text(
+                      'Suas Vendas Realizadas',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    _sellerSales.isEmpty
+                        ? Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(24.0),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF2B2724) : Colors.brown.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Column(
+                              children: [
+                                Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Nenhuma venda registrada ainda.',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _sellerSales.length,
+                            itemBuilder: (context, index) {
+                              final sale = _sellerSales[index];
+                              final formattedDate = '${sale.saleDate.day}/${sale.saleDate.month}/${sale.saleDate.year}';
+                              final imageUrl = _productImages[sale.productId] ?? _getPlaceholderImage(sale.productId ?? index);
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Container(
+                                  height: 120,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Stack(
+                                      children: [
+                                        // Background Image
+                                        Positioned.fill(
+                                          child: imageUrl.startsWith('data:')
+                                              ? Image.memory(
+                                                  base64Decode(imageUrl.split(',').last),
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : Image.network(
+                                                  imageUrl,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                        ),
+                                        // Dark overlay
+                                        Positioned.fill(
+                                          child: Container(
+                                            color: Colors.black.withOpacity(0.65),
+                                          ),
+                                        ),
+                                        
+                                        // Content
+                                        Padding(
+                                          padding: const EdgeInsets.all(16.0),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      sale.productName,
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 16,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    formattedDate,
+                                                    style: const TextStyle(
+                                                      color: Colors.white70,
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        'Qtd: ${sale.quantity.toStringAsFixed(sale.quantity % 1 == 0 ? 0 : 1)}',
+                                                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        'Total: R\$ ${sale.totalValue.toStringAsFixed(2)}',
+                                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                                    children: [
+                                                      Text(
+                                                        'Seu Lucro: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
+                                                        style: const TextStyle(
+                                                          color: Colors.greenAccent,
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 14,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -237,15 +353,16 @@ class _SellerDashboardState extends State<SellerDashboard> {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               title,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
                 color: color,
                 letterSpacing: 0.5,
@@ -255,7 +372,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
             Text(
               value,
               style: GoogleFonts.outfit(
-                fontSize: 18,
+                fontSize: 26,
                 fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : Colors.black87,
               ),
