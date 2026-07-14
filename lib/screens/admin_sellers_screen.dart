@@ -200,50 +200,111 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
 
   void _showEditSellerDialog(Profile seller) {
     final editNameController = TextEditingController(text: seller.name);
+    final editEmailController = TextEditingController(text: seller.email ?? '');
+    final editPasswordController = TextEditingController();
+    bool isSaving = false;
+
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('Editar Nome do Vendedor', style: GoogleFonts.merriweather(fontSize: 18, fontWeight: FontWeight.bold)),
-          content: TextField(
-            controller: editNameController,
-            decoration: const InputDecoration(
-              labelText: 'Nome Completo',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final newName = editNameController.text.trim();
-                if (newName.isEmpty) return;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Editar Vendedor', style: GoogleFonts.merriweather(fontSize: 18, fontWeight: FontWeight.bold)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: editNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome Completo',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: editEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'E-mail de Acesso',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: editPasswordController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Nova Senha (deixe em branco para manter)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving ? null : () async {
+                    final newName = editNameController.text.trim();
+                    final newEmail = editEmailController.text.trim();
+                    final newPassword = editPasswordController.text;
 
-                Navigator.pop(context);
-                setState(() => _isLoading = true);
-                try {
-                  await DatabaseHelper.instance.updateProfileName(seller.id, newName);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Nome atualizado com sucesso!'), backgroundColor: Colors.green),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Erro ao atualizar nome.'), backgroundColor: AppTheme.brandRed),
-                    );
-                  }
-                } finally {
-                  _loadSellers();
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
+                    if (newName.isEmpty || newEmail.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Nome e E-mail não podem ficar vazios.'), backgroundColor: AppTheme.brandRed),
+                      );
+                      return;
+                    }
+
+                    setDialogState(() => isSaving = true);
+                    try {
+                      // 1. Atualizar nome no perfil se alterado
+                      if (newName != seller.name) {
+                        await DatabaseHelper.instance.updateProfileName(seller.id, newName);
+                      }
+                      
+                      // 2. Atualizar email e/ou senha se alterados
+                      if (newEmail != seller.email || newPassword.isNotEmpty) {
+                        await DatabaseHelper.instance.adminUpdateUser(
+                          seller.id,
+                          email: newEmail,
+                          password: newPassword.isNotEmpty ? newPassword : null,
+                        );
+                      }
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Dados do vendedor atualizados com sucesso!'), backgroundColor: Colors.green),
+                        );
+                        Navigator.pop(context);
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Erro ao salvar alterações: $e'), backgroundColor: AppTheme.brandRed),
+                        );
+                      }
+                    } finally {
+                      setDialogState(() => isSaving = false);
+                      _loadSellers();
+                    }
+                  },
+                  child: isSaving
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                        )
+                      : const Text('Salvar'),
+                ),
+              ],
+            );
+          }
         );
       },
     );
@@ -320,7 +381,7 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
                             child: Icon(Icons.person, color: Colors.black),
                           ),
                           title: Text(seller.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: const Text('Papel: Vendedor / Revendedor'),
+                          subtitle: Text(seller.email != null ? 'E-mail: ${seller.email}' : 'Papel: Vendedor / Revendedor'),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -351,7 +412,7 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
                                       children: [
                                         Icon(Icons.edit_outlined, size: 18),
                                         SizedBox(width: 8),
-                                        Text('Editar Nome'),
+                                        Text('Editar Vendedor'),
                                       ],
                                     ),
                                   ),

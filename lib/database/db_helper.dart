@@ -292,12 +292,26 @@ class DatabaseHelper {
   }
 
   Future<List<Profile>> getSellers() async {
-    final response = await _client.from('profiles').select().eq('role', 'seller').order('name');
-    return response.map<Profile>((json) => Profile.fromMap(json)).toList();
+    try {
+      final response = await _client.rpc('get_sellers_with_emails');
+      return (response as List).map<Profile>((json) => Profile.fromMap(json)).toList();
+    } catch (e) {
+      print('Erro ao obter vendedores por RPC, tentando fallback: $e');
+      final response = await _client.from('profiles').select().eq('role', 'seller').order('name');
+      return response.map<Profile>((json) => Profile.fromMap(json)).toList();
+    }
   }
 
   Future<void> updateProfileName(String uid, String newName) async {
     await _client.from('profiles').update({'name': newName}).eq('id', uid);
+  }
+
+  Future<void> adminUpdateUser(String userId, {String? email, String? password}) async {
+    await _client.rpc('admin_update_user', params: {
+      'user_id': userId,
+      'new_email': email ?? '',
+      'new_password': password ?? '',
+    });
   }
 
   Future<void> deleteProfile(String uid) async {
