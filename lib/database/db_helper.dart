@@ -60,22 +60,40 @@ class DatabaseHelper {
   }
 
   Future<List<Recipe>> readAllRecipes() async {
-    final response = await _client.from('recipes').select().order('name', ascending: true);
-    List<Recipe> recipes = response.map<Recipe>((json) => Recipe.fromMap(json)).toList();
+    final results = await Future.wait([
+      _client.from('recipes').select().order('name', ascending: true),
+      _client.from('ingredients').select('id, name, unit'),
+      _client.from('recipe_ingredients').select(),
+    ]);
 
-    final allIngredients = await readAllIngredients();
+    final recipesList = results[0] as List;
+    final allIngredientsRaw = results[1] as List;
+    final allRecipeIngredientsRaw = results[2] as List;
 
-    for (var recipe in recipes) {
-      final riMaps = await _client.from('recipe_ingredients').select().eq('recipeid', recipe.id!);
-      recipe.ingredients = riMaps.map<RecipeIngredient>((json) {
-        final ri = RecipeIngredient.fromMap(json);
-        try {
-          final ing = allIngredients.firstWhere((i) => i.id == ri.ingredientId);
+    final ingredientsMap = <int, Ingredient>{};
+    for (var json in allIngredientsRaw) {
+      final ing = Ingredient.fromMap(json);
+      if (ing.id != null) ingredientsMap[ing.id!] = ing;
+    }
+
+    final recipeIngredientsByRecipeId = <int, List<RecipeIngredient>>{};
+    for (var json in allRecipeIngredientsRaw) {
+      final ri = RecipeIngredient.fromMap(json);
+      if (ri.recipeId != null) {
+        final ing = ingredientsMap[ri.ingredientId];
+        if (ing != null) {
           ri.ingredientName = ing.name;
           ri.ingredientUnit = ing.unit;
-        } catch (_) {}
-        return ri;
-      }).toList();
+        }
+        recipeIngredientsByRecipeId.putIfAbsent(ri.recipeId!, () => []).add(ri);
+      }
+    }
+
+    final List<Recipe> recipes = [];
+    for (var json in recipesList) {
+      final recipe = Recipe.fromMap(json);
+      recipe.ingredients = recipeIngredientsByRecipeId[recipe.id] ?? [];
+      recipes.add(recipe);
     }
     return recipes;
   }
@@ -126,26 +144,65 @@ class DatabaseHelper {
   }
 
   Future<List<Product>> readAllProducts() async {
-    final productsResponse = await _client.from('products').select().order('name', ascending: true);
-    List<Product> products = productsResponse.map<Product>((json) => Product.fromMap(json)).toList();
-    
-    final allRecipes = await readAllRecipes();
+    final results = await Future.wait([
+      _client.from('products').select().order('name', ascending: true),
+      _client.from('product_recipes').select(),
+      _client.from('product_expenses').select(),
+      _client.from('recipes').select('id, name'),
+    ]);
 
-    for (var product in products) {
-      final prMaps = await _client.from('product_recipes').select().eq('productid', product.id!);
-      product.recipes = prMaps.map<ProductRecipe>((json) {
-        final pr = ProductRecipe.fromMap(json);
-        try {
-          final rec = allRecipes.firstWhere((r) => r.id == pr.recipeId);
-          pr.recipeName = rec.name;
-        } catch (_) {}
-        return pr;
-      }).toList();
-      
-      final peMaps = await _client.from('product_expenses').select().eq('productid', product.id!);
-      product.extraExpenses = peMaps.map<ProductExpense>((json) => ProductExpense.fromMap(json)).toList();
+    final productsList = results[0] as List;
+    final allProductRecipesRaw = results[1] as List;
+    final allProductExpensesRaw = results[2] as List;
+    final allRecipesRaw = results[3] as List;
+
+    final recipeNameMap = <int, String>{};
+    for (var r in allRecipesRaw) {
+      if (r['id'] != null && r['name'] != null) {
+        recipeNameMap[r['id'] as int] = r['name'].toString();
+      }
+    }
+
+    final productRecipesByProductId = <int, List<ProductRecipe>>{};
+    for (var json in allProductRecipesRaw) {
+      final pr = ProductRecipe.fromMap(json);
+      if (pr.productId != null) {
+        pr.recipeName = recipeNameMap[pr.recipeId] ?? '';
+        productRecipesByProductId.putIfAbsent(pr.productId!, () => []).add(pr);
+      }
+    }
+
+    final productExpensesByProductId = <int, List<ProductExpense>>{};
+    for (var json in allProductExpensesRaw) {
+      final pe = ProductExpense.fromMap(json);
+      if (pe.productId != null) {
+        productExpensesByProductId.putIfAbsent(pe.productId!, () => []).add(pe);
+      }
+    }
+
+    final List<Product> products = [];
+    for (var json in productsList) {
+      final product = Product.fromMap(json);
+      product.recipes = productRecipesByProductId[product.id] ?? [];
+      product.extraExpenses = productExpensesByProductId[product.id] ?? [];
+      products.add(product);
     }
     return products;
+  }
+
+  Future<Map<int, String>> getProductImages() async {
+    try {
+      final response = await _client.from('products').select('id, imagepath');
+      final map = <int, String>{};
+      for (var r in response) {
+        if (r['id'] != null && r['imagepath'] != null && r['imagepath'].toString().isNotEmpty) {
+          map[r['id'] as int] = r['imagepath'].toString();
+        }
+      }
+      return map;
+    } catch (_) {
+      return {};
+    }
   }
 
   Future<int> deleteProduct(int id) async {
@@ -191,6 +248,21 @@ class DatabaseHelper {
       return response['value'] as String;
     }
     return null;
+  }
+
+  Future<Map<String, String>> getAllSettings() async {
+    try {
+      final response = await _client.from('settings').select();
+      final map = <String, String>{};
+      for (var row in response) {
+        if (row['key'] != null && row['value'] != null) {
+          map[row['key'].toString()] = row['value'].toString();
+        }
+      }
+      return map;
+    } catch (_) {
+      return {};
+    }
   }
 
   // --- SALES CRUD ---
@@ -302,8 +374,19 @@ class DatabaseHelper {
     }
   }
 
-  Future<void> updateProfileName(String uid, String newName) async {
-    await _client.from('profiles').update({'name': newName}).eq('id', uid);
+  Future<void> updateProfileName(String uid, String newName, {String? oldName, double? commissionPercent}) async {
+    final Map<String, dynamic> updateData = {'name': newName};
+    if (commissionPercent != null) {
+      updateData['commission_percent'] = commissionPercent;
+    }
+    await _client.from('profiles').update(updateData).eq('id', uid);
+
+    if (oldName != null && oldName.trim().isNotEmpty && oldName.trim().toLowerCase() != newName.trim().toLowerCase()) {
+      await _client
+          .from('sales')
+          .update({'sellername': newName.trim()})
+          .ilike('sellername', oldName.trim());
+    }
   }
 
   Future<void> adminUpdateUser(String userId, {String? email, String? password}) async {

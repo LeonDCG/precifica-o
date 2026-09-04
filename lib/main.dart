@@ -20,17 +20,14 @@ void main() async {
       anonKey: DatabaseHelper.supabaseAnonKey,
     );
     
-    await DatabaseHelper.instance.seedData(); // Popula os dados iniciais se vazio!
-    
-    // Carregar preferência de tema
-    final themeStr = await DatabaseHelper.instance.getSetting('themeMode');
-    if (themeStr == 'dark') {
-      themeNotifier.value = ThemeMode.dark;
-    } else {
-      themeNotifier.value = ThemeMode.light;
-    }
-    
     runApp(const PrecificacaoApp());
+    
+    // Carregar preferência de tema em background sem travar a abertura inicial
+    DatabaseHelper.instance.getSetting('themeMode').then((themeStr) {
+      if (themeStr == 'dark') {
+        themeNotifier.value = ThemeMode.dark;
+      }
+    }).catchError((_) {});
   } catch (e, stack) {
     runApp(MaterialApp(
       home: Scaffold(

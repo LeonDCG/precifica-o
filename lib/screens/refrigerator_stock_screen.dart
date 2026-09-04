@@ -30,9 +30,14 @@ class _RefrigeratorStockScreenState extends State<RefrigeratorStockScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      _stockItems = await DatabaseHelper.instance.readRefrigeratorStock();
-      _products = await DatabaseHelper.instance.readAllProducts();
-      _recipes = await DatabaseHelper.instance.readAllRecipes();
+      final results = await Future.wait([
+        DatabaseHelper.instance.readRefrigeratorStock(),
+        DatabaseHelper.instance.readAllProducts(),
+        DatabaseHelper.instance.readAllRecipes(),
+      ]);
+      _stockItems = results[0] as List<RefrigeratorItem>;
+      _products = results[1] as List<Product>;
+      _recipes = results[2] as List<Recipe>;
     } catch (e) {
       debugPrint('Erro ao carregar geladeira: $e');
     } finally {

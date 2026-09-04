@@ -26,7 +26,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
   
   String _sellerType = 'me'; // 'me' ou 'other'
   String _sellerName = '';
-  double _commissionPercent = 10.0;
+  double _commissionPercent = 30.0;
   String _saleUnitType = 'unit'; // 'unit' ou 'whole'
   
   bool _isLoading = true;
@@ -51,7 +51,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       if (_profile != null && _profile!.role == 'seller') {
         _sellerType = 'other';
         _sellerName = _profile!.name;
-        _commissionPercent = 10.0;
+        _commissionPercent = _profile!.commissionPercent;
       }
       _isLoading = false;
     });
@@ -86,7 +86,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
 
   double get _commissionValue {
     if (_sellerType == 'me') return 0.0;
-    // Comissão calculada sobre o LUCRO da venda
+    // Comissão calculada sobre o LUCRO BRUTO da venda
     if (_totalSaleProfit <= 0) return 0.0;
     return _totalSaleProfit * (_commissionPercent / 100);
   }

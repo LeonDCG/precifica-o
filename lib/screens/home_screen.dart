@@ -65,7 +65,9 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<Widget> get _pages {
+  List<Widget>? _cachedPages;
+
+  List<Widget> _buildPages() {
     final role = _profile?.role ?? 'seller';
     if (role == 'admin') {
       return [
@@ -143,13 +145,16 @@ class HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final pages = _pages;
+    final pages = _cachedPages ??= _buildPages();
     if (_currentIndex >= pages.length) {
       _currentIndex = 0;
     }
 
     return Scaffold(
-      body: pages[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,

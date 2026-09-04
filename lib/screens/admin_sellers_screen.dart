@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/db_helper.dart';
 import '../models/profile.dart';
+import '../models/sale.dart';
 import '../theme/app_theme.dart';
 
 class AdminSellersScreen extends StatefulWidget {
@@ -15,11 +16,13 @@ class AdminSellersScreen extends StatefulWidget {
 class _AdminSellersScreenState extends State<AdminSellersScreen> {
   bool _isLoading = true;
   List<Profile> _sellers = [];
+  List<Sale> _allSales = [];
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _commissionController = TextEditingController(text: '30');
   bool _isCreating = false;
 
   @override
@@ -33,15 +36,20 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _commissionController.dispose();
     super.dispose();
   }
 
   Future<void> _loadSellers() async {
     setState(() => _isLoading = true);
     try {
-      final list = await DatabaseHelper.instance.getSellers();
+      final results = await Future.wait([
+        DatabaseHelper.instance.getSellers(),
+        DatabaseHelper.instance.readAllSales(),
+      ]);
       setState(() {
-        _sellers = list;
+        _sellers = results[0] as List<Profile>;
+        _allSales = results[1] as List<Sale>;
       });
     } catch (e) {
       debugPrint('Erro ao carregar vendedores: $e');
@@ -58,6 +66,7 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
       final name = _nameController.text.trim();
       final email = _emailController.text.trim();
       final password = _passwordController.text;
+      final commissionPercent = double.tryParse(_commissionController.text.replaceAll(',', '.')) ?? 30.0;
 
       // Usando cliente temporário para não deslogar o Admin
       final tempClient = SupabaseClient(
@@ -76,6 +85,7 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
           id: newUser.id,
           name: name,
           role: 'seller',
+          commissionPercent: commissionPercent,
         );
         await DatabaseHelper.instance.createProfile(newProfile);
 
@@ -168,6 +178,17 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
                         ),
                         validator: (v) => v!.length < 6 ? 'Mínimo de 6 caracteres' : null,
                       ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _commissionController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Comissão Padrão (% sobre o lucro)',
+                          border: OutlineInputBorder(),
+                          suffixText: '%',
+                        ),
+                        validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+                      ),
                       const SizedBox(height: 20),
                       ElevatedButton(
                         onPressed: _isCreating ? null : () async {
@@ -202,6 +223,7 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
     final editNameController = TextEditingController(text: seller.name);
     final editEmailController = TextEditingController(text: seller.email ?? '');
     final editPasswordController = TextEditingController();
+    final editCommissionController = TextEditingController(text: seller.commissionPercent.toStringAsFixed(0));
     bool isSaving = false;
 
     showDialog(
@@ -233,6 +255,16 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      controller: editCommissionController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Comissão Padrão (% sobre o lucro)',
+                        border: OutlineInputBorder(),
+                        suffixText: '%',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
                       controller: editPasswordController,
                       obscureText: true,
                       decoration: const InputDecoration(
@@ -253,6 +285,7 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
                     final newName = editNameController.text.trim();
                     final newEmail = editEmailController.text.trim();
                     final newPassword = editPasswordController.text;
+                    final newCommission = double.tryParse(editCommissionController.text.replaceAll(',', '.')) ?? seller.commissionPercent;
 
                     if (newName.isEmpty || newEmail.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -263,16 +296,22 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
 
                     setDialogState(() => isSaving = true);
                     try {
-                      // 1. Atualizar nome no perfil se alterado
-                      if (newName != seller.name) {
-                        await DatabaseHelper.instance.updateProfileName(seller.id, newName);
+                      // 1. Atualizar nome e comissão no perfil (e sincronizar vendas legadas se o nome mudou)
+                      if (newName != seller.name || newCommission != seller.commissionPercent) {
+                        await DatabaseHelper.instance.updateProfileName(
+                          seller.id,
+                          newName,
+                          oldName: seller.name,
+                          commissionPercent: newCommission,
+                        );
                       }
                       
                       // 2. Atualizar email e/ou senha se alterados
-                      if (newEmail != seller.email || newPassword.isNotEmpty) {
+                      final currentEmail = seller.email ?? '';
+                      if (newEmail != currentEmail || newPassword.isNotEmpty) {
                         await DatabaseHelper.instance.adminUpdateUser(
                           seller.id,
-                          email: newEmail,
+                          email: newEmail != currentEmail ? newEmail : null,
                           password: newPassword.isNotEmpty ? newPassword : null,
                         );
                       }
@@ -373,60 +412,120 @@ class _AdminSellersScreenState extends State<AdminSellersScreen> {
                     itemCount: _sellers.length,
                     itemBuilder: (context, index) {
                       final seller = _sellers[index];
+                      final sellerNameNorm = seller.name.trim().toLowerCase();
+                      final sellerSales = _allSales.where((s) => s.sellerName.trim().toLowerCase() == sellerNameNorm).toList();
+                      
+                      double totalRevenue = 0.0;
+                      double totalCommission = 0.0;
+                      double totalNetProfit = 0.0;
+                      for (var s in sellerSales) {
+                        totalRevenue += s.totalValue;
+                        totalCommission += s.commissionValue;
+                        totalNetProfit += s.netProfit;
+                      }
+
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: AppTheme.brandGold,
-                            child: Icon(Icons.person, color: Colors.black),
-                          ),
-                          title: Text(seller.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(seller.email != null ? 'E-mail: ${seller.email}' : 'Papel: Vendedor / Revendedor'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const CircleAvatar(
+                                  backgroundColor: AppTheme.brandGold,
+                                  child: Icon(Icons.person, color: Colors.black),
                                 ),
-                                child: const Text(
-                                  'Ativo',
-                                  style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11),
+                                title: Text(seller.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text('${seller.email != null ? 'E-mail: ${seller.email}' : 'Vendedor'}  •  Comissão: ${seller.commissionPercent.toStringAsFixed(0)}%'),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: const Text(
+                                        'Ativo',
+                                        style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11),
+                                      ),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert),
+                                      onSelected: (value) {
+                                        if (value == 'edit') {
+                                          _showEditSellerDialog(seller);
+                                        } else if (value == 'delete') {
+                                          _confirmDeleteSeller(seller);
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit_outlined, size: 18),
+                                              SizedBox(width: 8),
+                                              Text('Editar Vendedor'),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                                              SizedBox(width: 8),
+                                              Text('Excluir', style: TextStyle(color: Colors.red)),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
-                              PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert),
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _showEditSellerDialog(seller);
-                                  } else if (value == 'delete') {
-                                    _confirmDeleteSeller(seller);
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Row(
+                              const Divider(height: 16),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.white.withOpacity(0.05)
+                                      : Colors.brown.withOpacity(0.04),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
-                                        Icon(Icons.edit_outlined, size: 18),
-                                        SizedBox(width: 8),
-                                        Text('Editar Vendedor'),
+                                        const Text('Total Vendido', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 2),
+                                        Text('R\$ ${totalRevenue.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                       ],
                                     ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
-                                        Icon(Icons.delete_outline, color: Colors.red, size: 18),
-                                        SizedBox(width: 8),
-                                        Text('Excluir', style: TextStyle(color: Colors.red)),
+                                        const Text('Comissão Acumulada', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 2),
+                                        Text('R\$ ${totalCommission.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 12)),
                                       ],
                                     ),
-                                  ),
-                                ],
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        const Text('Lucro Confeitaria', style: TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 2),
+                                        Text('R\$ ${totalNetProfit.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 12)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),

@@ -77,16 +77,15 @@ class _SalesScreenState extends State<SalesScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      var salesData = await DatabaseHelper.instance.readAllSales();
-      final products = await DatabaseHelper.instance.readAllProducts();
-      final Map<int, String> images = {};
-      for (var p in products) {
-        if (p.id != null && p.imagePath.isNotEmpty) {
-          images[p.id!] = p.imagePath;
-        }
-      }
+      final results = await Future.wait([
+        DatabaseHelper.instance.readAllSales(),
+        DatabaseHelper.instance.getProductImages(),
+      ]);
+      var salesData = results[0] as List<Sale>;
+      final images = results[1] as Map<int, String>;
       if (widget.profile != null && widget.profile!.role == 'seller') {
-        salesData = salesData.where((s) => s.sellerName == widget.profile!.name).toList();
+        final profileName = widget.profile!.name.trim().toLowerCase();
+        salesData = salesData.where((s) => s.sellerName.trim().toLowerCase() == profileName).toList();
       }
       if (mounted) {
         setState(() {
@@ -663,35 +662,35 @@ class _SalesScreenState extends State<SalesScreen> {
                                                    crossAxisAlignment: CrossAxisAlignment.end,
                                                    children: [
                                                      if (widget.profile?.role != 'seller') ...[
-                                                       Text(
-                                                         'Lucro: R\$ ${sale.netProfit.toStringAsFixed(2)}',
-                                                         style: const TextStyle(
-                                                           color: Colors.greenAccent,
+                                                        Text(
+                                                          'Lucro Conf.: R\$ ${sale.netProfit.toStringAsFixed(2)}',
+                                                          style: const TextStyle(
+                                                            color: Colors.greenAccent,
                                                             fontWeight: FontWeight.bold,
-                                                           fontSize: 14,
-                                                         ),
-                                                       ),
-                                                       if (sale.commissionValue > 0) ...[
-                                                         const SizedBox(height: 2),
-                                                         Text(
-                                                           'Comissão: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
-                                                           style: const TextStyle(
-                                                             color: Colors.orangeAccent,
-                                                             fontSize: 11,
-                                                             fontWeight: FontWeight.w600,
-                                                           ),
-                                                         ),
-                                                       ],
-                                                     ] else ...[
-                                                       Text(
-                                                         'Comissão: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
-                                                         style: const TextStyle(
-                                                           color: Colors.greenAccent,
-                                                           fontWeight: FontWeight.bold,
-                                                           fontSize: 14,
-                                                         ),
-                                                       ),
-                                                     ],
+                                                            fontSize: 13,
+                                                          ),
+                                                        ),
+                                                        if (sale.commissionValue > 0) ...[
+                                                          const SizedBox(height: 2),
+                                                          Text(
+                                                            'Comissão (${sale.commissionPercent.toStringAsFixed(0)}% lucro): R\$ ${sale.commissionValue.toStringAsFixed(2)}',
+                                                            style: const TextStyle(
+                                                              color: Colors.orangeAccent,
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ] else ...[
+                                                        Text(
+                                                          'Sua Comissão: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
+                                                          style: const TextStyle(
+                                                            color: Colors.greenAccent,
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 14,
+                                                          ),
+                                                        ),
+                                                      ],
                                                    ],
                                                  ),
                                                ],

@@ -33,25 +33,22 @@ class _SellerDashboardState extends State<SellerDashboard> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Carrega estoque consignado
-      _consignedStock = await DatabaseHelper.instance.getSellerStock(widget.profile.id);
+      final results = await Future.wait([
+        DatabaseHelper.instance.getSellerStock(widget.profile.id),
+        DatabaseHelper.instance.getProductImages(),
+        DatabaseHelper.instance.readAllSales(),
+      ]);
 
-      // 2. Carrega todos os produtos para as imagens
-      final products = await DatabaseHelper.instance.readAllProducts();
-      final Map<int, String> images = {};
-      for (var p in products) {
-        if (p.id != null && p.imagePath.isNotEmpty) {
-          images[p.id!] = p.imagePath;
-        }
-      }
+      _consignedStock = results[0] as List<Map<String, dynamic>>;
+      final images = results[1] as Map<int, String>;
+      final sales = results[2] as List<Sale>;
 
-      // 3. Calcula comissões e filtra vendas do vendedor
-      final sales = await DatabaseHelper.instance.readAllSales();
       final List<Sale> filteredSales = [];
       double commissionSum = 0.0;
 
+      final profileName = widget.profile.name.trim().toLowerCase();
       for (var s in sales) {
-        if (s.sellerName == widget.profile.name) {
+        if (s.sellerName.trim().toLowerCase() == profileName) {
           filteredSales.add(s);
           commissionSum += s.commissionValue;
         }

@@ -42,18 +42,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final salaryStr = await DatabaseHelper.instance.getSetting('desiredSalary');
-      final hoursStr = await DatabaseHelper.instance.getSetting('workedHoursPerMonth');
-      final targetStr = await DatabaseHelper.instance.getSetting('salesTarget');
+      final results = await Future.wait([
+        DatabaseHelper.instance.getAllSettings(),
+        DatabaseHelper.instance.readAllProducts(),
+        DatabaseHelper.instance.readAllSales(),
+      ]);
+
+      final settings = results[0] as Map<String, String>;
+      final prods = results[1] as List<Product>;
+      final sales = results[2] as List<Sale>;
+
+      final salaryStr = settings['desiredSalary'];
+      final hoursStr = settings['workedHoursPerMonth'];
+      final targetStr = settings['salesTarget'];
       
       if (salaryStr != null) _desiredSalary = double.tryParse(salaryStr) ?? 2000.0;
       if (hoursStr != null) _workedHoursPerMonth = double.tryParse(hoursStr) ?? 160.0;
       if (targetStr != null) _monthlyTarget = double.tryParse(targetStr) ?? 0.0;
       
-      _products = await DatabaseHelper.instance.readAllProducts();
+      _products = prods;
 
       // Calcular Lucro Mensal Real
-      final sales = await DatabaseHelper.instance.readAllSales();
       final now = DateTime.now();
       final monthStart = DateTime(now.year, now.month, 1);
       
