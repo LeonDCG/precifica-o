@@ -4,7 +4,7 @@ import '../models/order_request.dart';
 import '../database/db_helper.dart';
 
 class AdminOrdersPanelScreen extends StatefulWidget {
-  const AdminOrdersPanelScreen({Key? key}) : super(key: key);
+  const AdminOrdersPanelScreen({super.key});
 
   @override
   State<AdminOrdersPanelScreen> createState() => _AdminOrdersPanelScreenState();

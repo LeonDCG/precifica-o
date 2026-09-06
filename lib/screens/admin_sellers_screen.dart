@@ -7,7 +7,7 @@ import '../models/sale.dart';
 import '../theme/app_theme.dart';
 
 class AdminSellersScreen extends StatefulWidget {
-  const AdminSellersScreen({Key? key}) : super(key: key);
+  const AdminSellersScreen({super.key});
 
   @override
   State<AdminSellersScreen> createState() => _AdminSellersScreenState();

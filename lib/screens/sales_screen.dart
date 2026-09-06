@@ -1,14 +1,14 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../database/db_helper.dart';
 import '../models/sale.dart';
 import 'add_sale_screen.dart';
 import '../models/profile.dart';
+import '../widgets/app_cached_image.dart';
 
 class SalesScreen extends StatefulWidget {
   final Profile? profile;
-  const SalesScreen({Key? key, this.profile}) : super(key: key);
+  const SalesScreen({super.key, this.profile});
 
   @override
   State<SalesScreen> createState() => _SalesScreenState();
@@ -77,16 +77,20 @@ class _SalesScreenState extends State<SalesScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
+      final Future<List<Sale>> salesFuture;
+      if (widget.profile != null && widget.profile!.role == 'seller') {
+        salesFuture = DatabaseHelper.instance.readSalesForSeller(widget.profile!.name);
+      } else {
+        salesFuture = DatabaseHelper.instance.readAllSales();
+      }
+
       final results = await Future.wait([
-        DatabaseHelper.instance.readAllSales(),
+        salesFuture,
         DatabaseHelper.instance.getProductImages(),
       ]);
-      var salesData = results[0] as List<Sale>;
+      final salesData = results[0] as List<Sale>;
       final images = results[1] as Map<int, String>;
-      if (widget.profile != null && widget.profile!.role == 'seller') {
-        final profileName = widget.profile!.name.trim().toLowerCase();
-        salesData = salesData.where((s) => s.sellerName.trim().toLowerCase() == profileName).toList();
-      }
+
       if (mounted) {
         setState(() {
           _sales = salesData;
@@ -516,22 +520,19 @@ class _SalesScreenState extends State<SalesScreen> {
                                   borderRadius: BorderRadius.circular(16),
                                   child: Stack(
                                     children: [
-                                      // Background Image
+                                      // Background Image otimizada com AppCachedImage
                                       Positioned.fill(
-                                        child: imageUrl.startsWith('data:')
-                                            ? Image.memory(
-                                                base64Decode(imageUrl.split(',').last),
-                                                fit: BoxFit.cover,
-                                              )
-                                            : Image.network(
-                                                imageUrl,
-                                                fit: BoxFit.cover,
-                                              ),
+                                        child: AppCachedImage(
+                                          imageUrl: imageUrl,
+                                          fit: BoxFit.cover,
+                                          cacheWidth: 500,
+                                          cacheHeight: 300,
+                                        ),
                                       ),
                                       // Dark overlay
                                       Positioned.fill(
                                         child: Container(
-                                          color: Colors.black.withOpacity(0.65),
+                                          color: Colors.black.withValues(alpha: 0.65),
                                         ),
                                       ),
                                       

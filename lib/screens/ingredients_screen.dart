@@ -4,7 +4,7 @@ import '../database/db_helper.dart';
 import '../widgets/add_ingredient_sheet.dart';
 
 class IngredientsScreen extends StatefulWidget {
-  const IngredientsScreen({Key? key}) : super(key: key);
+  const IngredientsScreen({super.key});
 
   @override
   State<IngredientsScreen> createState() => _IngredientsScreenState();

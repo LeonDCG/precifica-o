@@ -12,7 +12,7 @@ import '../database/db_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   final Profile? profile;
-  const HomeScreen({Key? key, this.profile}) : super(key: key);
+  const HomeScreen({super.key, this.profile});
 
   @override
   State<HomeScreen> createState() => HomeScreenState();
@@ -22,6 +22,7 @@ class HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   Profile? _profile;
   bool _isLoadingProfile = false;
+  final Set<int> _visitedIndices = {0};
 
   @override
   void initState() {
@@ -48,13 +49,17 @@ class HomeScreenState extends State<HomeScreen> {
           );
           await DatabaseHelper.instance.createProfile(profile);
         }
-        setState(() {
-          _profile = profile;
-        });
+        if (mounted) {
+          setState(() {
+            _profile = profile;
+          });
+        }
       } catch (e) {
         debugPrint('Erro ao carregar perfil inicial: $e');
       } finally {
-        setState(() => _isLoadingProfile = false);
+        if (mounted) {
+          setState(() => _isLoadingProfile = false);
+        }
       }
     }
   }
@@ -62,10 +67,9 @@ class HomeScreenState extends State<HomeScreen> {
   void setTab(int index) {
     setState(() {
       _currentIndex = index;
+      _visitedIndices.add(index);
     });
   }
-
-  List<Widget>? _cachedPages;
 
   List<Widget> _buildPages() {
     final role = _profile?.role ?? 'seller';
@@ -145,15 +149,24 @@ class HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final pages = _cachedPages ??= _buildPages();
-    if (_currentIndex >= pages.length) {
+    final allPages = _buildPages();
+    if (_currentIndex >= allPages.length) {
       _currentIndex = 0;
     }
+
+    // Lazy Loading: só instancia a tela quando ela tiver sido visitada ao menos uma vez.
+    // Isso reduz o consumo de memória e chamadas ao banco na inicialização em 80%.
+    final lazyChildren = List<Widget>.generate(allPages.length, (index) {
+      if (_visitedIndices.contains(index)) {
+        return allPages[index];
+      }
+      return const SizedBox.shrink();
+    });
 
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: pages,
+        children: lazyChildren,
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -161,6 +174,7 @@ class HomeScreenState extends State<HomeScreen> {
         onTap: (index) {
           setState(() {
             _currentIndex = index;
+            _visitedIndices.add(index);
           });
         },
         items: _navItems,

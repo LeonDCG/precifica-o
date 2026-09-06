@@ -8,7 +8,7 @@ import '../utils/unit_converter.dart';
 class AddRecipeScreen extends StatefulWidget {
   final Recipe? recipe;
 
-  const AddRecipeScreen({Key? key, this.recipe}) : super(key: key);
+  const AddRecipeScreen({super.key, this.recipe});
 
   @override
   State<AddRecipeScreen> createState() => _AddRecipeScreenState();

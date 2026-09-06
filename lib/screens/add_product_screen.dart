@@ -4,11 +4,12 @@ import 'package:image_picker/image_picker.dart';
 import '../models/product.dart';
 import '../models/recipe.dart';
 import '../database/db_helper.dart';
+import '../widgets/app_cached_image.dart';
 
 class AddProductScreen extends StatefulWidget {
   final Product? product;
 
-  const AddProductScreen({Key? key, this.product}) : super(key: key);
+  const AddProductScreen({super.key, this.product});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -62,15 +63,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Future<void> _pickImage() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 70,
+      );
       if (image != null) {
         final bytes = await image.readAsBytes();
         final base64String = base64Encode(bytes);
         final ext = image.name.split('.').last.toLowerCase();
         final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
-        setState(() {
-          _imagePath = 'data:$mime;base64,$base64String';
-        });
+        if (mounted) {
+          setState(() {
+            _imagePath = 'data:$mime;base64,$base64String';
+          });
+        }
       }
     } catch (e) {
       debugPrint('Erro ao selecionar imagem: $e');
@@ -269,28 +277,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     shape: BoxShape.circle,
-                    image: _imagePath.isNotEmpty
-                        ? DecorationImage(
-                            image: _imagePath.startsWith('http') 
-                                ? NetworkImage(_imagePath) as ImageProvider
-                                : MemoryImage(base64Decode(_imagePath.split(',').last)),
+                    border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5), width: 2),
+                  ),
+                  child: ClipOval(
+                    child: _imagePath.isNotEmpty
+                        ? AppCachedImage(
+                            imageUrl: _imagePath,
+                            width: 120,
+                            height: 120,
                             fit: BoxFit.cover,
                           )
-                        : null,
-                    border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.5), width: 2),
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_a_photo, color: Theme.of(context).colorScheme.primary, size: 32),
+                              const SizedBox(height: 4),
+                              Text('Adicionar\nFoto', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
+                            ],
+                          ),
                   ),
-                  child: _imagePath.isEmpty
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_a_photo, color: Theme.of(context).colorScheme.primary, size: 32),
-                            const SizedBox(height: 4),
-                            Text('Adicionar\nFoto', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary)),
-                          ],
-                        )
-                      : null,
                 ),
               ),
             ),

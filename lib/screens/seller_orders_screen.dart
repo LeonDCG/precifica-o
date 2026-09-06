@@ -7,7 +7,7 @@ import '../database/db_helper.dart';
 
 class SellerOrdersScreen extends StatefulWidget {
   final Profile profile;
-  const SellerOrdersScreen({Key? key, required this.profile}) : super(key: key);
+  const SellerOrdersScreen({super.key, required this.profile});
 
   @override
   State<SellerOrdersScreen> createState() => _SellerOrdersScreenState();

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ingredient.dart';
 import '../models/product.dart';
@@ -17,21 +19,101 @@ class DatabaseHelper {
 
   SupabaseClient get _client => Supabase.instance.client;
 
+  // ==========================================
+  // CACHE EM MEMÓRIA & DESDUPLICAÇÃO DE REDE
+  // ==========================================
+  List<Ingredient>? _cachedIngredients;
+  List<Recipe>? _cachedRecipes;
+  List<Product>? _cachedProducts;
+  Map<int, String>? _cachedProductImages;
+  Map<String, String>? _cachedSettings;
+  List<Sale>? _cachedSales;
+  final Map<String, List<Sale>> _cachedSellerSales = {};
+  List<RefrigeratorItem>? _cachedStock;
+
+  // Futures em voo para desduplicar requisições concorrentes
+  Future<List<Ingredient>>? _inFlightIngredients;
+  Future<List<Recipe>>? _inFlightRecipes;
+  Future<List<Product>>? _inFlightProducts;
+  Future<Map<int, String>>? _inFlightProductImages;
+  Future<Map<String, String>>? _inFlightSettings;
+  Future<List<Sale>>? _inFlightSales;
+  Future<List<RefrigeratorItem>>? _inFlightStock;
+
+  void clearAllCache() {
+    _cachedIngredients = null;
+    _cachedRecipes = null;
+    _cachedProducts = null;
+    _cachedProductImages = null;
+    _cachedSettings = null;
+    _cachedSales = null;
+    _cachedSellerSales.clear();
+    _cachedStock = null;
+  }
+
+  void clearProductsCache() {
+    _cachedProducts = null;
+    _cachedProductImages = null;
+  }
+
+  void clearRecipesCache() {
+    _cachedRecipes = null;
+  }
+
+  void clearIngredientsCache() {
+    _cachedIngredients = null;
+  }
+
+  void clearSalesCache() {
+    _cachedSales = null;
+    _cachedSellerSales.clear();
+  }
+
+  void clearSettingsCache() {
+    _cachedSettings = null;
+  }
+
+  void clearStockCache() {
+    _cachedStock = null;
+  }
+
   // --- INGREDIENTS CRUD ---
   Future<Ingredient> createIngredient(Ingredient ingredient) async {
     var data = ingredient.toMap();
     data.remove('id'); // Deixa o Postgres gerar o ID
     final response = await _client.from('ingredients').insert(data).select().single();
+    clearIngredientsCache();
+    clearRecipesCache(); // Receitas dependem de ingredientes
     return Ingredient.fromMap(response);
   }
 
-  Future<List<Ingredient>> readAllIngredients() async {
+  Future<List<Ingredient>> readAllIngredients({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedIngredients != null) {
+      return _cachedIngredients!;
+    }
+    if (_inFlightIngredients != null) {
+      return _inFlightIngredients!;
+    }
+
+    _inFlightIngredients = _fetchIngredients();
+    try {
+      final res = await _inFlightIngredients!;
+      _cachedIngredients = res;
+      return res;
+    } finally {
+      _inFlightIngredients = null;
+    }
+  }
+
+  Future<List<Ingredient>> _fetchIngredients() async {
     final response = await _client.from('ingredients').select().order('name', ascending: true);
     return response.map<Ingredient>((json) => Ingredient.fromMap(json)).toList();
   }
 
   Future<int> deleteIngredient(int id) async {
     await _client.from('ingredients').delete().eq('id', id);
+    clearIngredientsCache();
+    clearRecipesCache();
     return 1;
   }
 
@@ -39,6 +121,8 @@ class DatabaseHelper {
     var data = ingredient.toMap();
     data.remove('id');
     await _client.from('ingredients').update(data).eq('id', ingredient.id!);
+    clearIngredientsCache();
+    clearRecipesCache();
     return 1;
   }
 
@@ -50,16 +134,40 @@ class DatabaseHelper {
     final newRecId = response['id'] as int;
     recipe.id = newRecId;
 
-    for (var ri in recipe.ingredients) {
-      ri.recipeId = newRecId;
-      var riData = ri.toMap();
-      riData.remove('id');
-      await _client.from('recipe_ingredients').insert(riData);
+    if (recipe.ingredients.isNotEmpty) {
+      final List<Map<String, dynamic>> riDataList = [];
+      for (var ri in recipe.ingredients) {
+        ri.recipeId = newRecId;
+        var riData = ri.toMap();
+        riData.remove('id');
+        riDataList.add(riData);
+      }
+      await _client.from('recipe_ingredients').insert(riDataList);
     }
+    clearRecipesCache();
+    clearProductsCache(); // Produtos dependem de receitas
     return recipe;
   }
 
-  Future<List<Recipe>> readAllRecipes() async {
+  Future<List<Recipe>> readAllRecipes({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedRecipes != null) {
+      return _cachedRecipes!;
+    }
+    if (_inFlightRecipes != null) {
+      return _inFlightRecipes!;
+    }
+
+    _inFlightRecipes = _fetchRecipes();
+    try {
+      final res = await _inFlightRecipes!;
+      _cachedRecipes = res;
+      return res;
+    } finally {
+      _inFlightRecipes = null;
+    }
+  }
+
+  Future<List<Recipe>> _fetchRecipes() async {
     final results = await Future.wait([
       _client.from('recipes').select().order('name', ascending: true),
       _client.from('ingredients').select('id, name, unit'),
@@ -101,6 +209,8 @@ class DatabaseHelper {
   Future<int> deleteRecipe(int id) async {
     await _client.from('recipe_ingredients').delete().eq('recipeid', id);
     await _client.from('recipes').delete().eq('id', id);
+    clearRecipesCache();
+    clearProductsCache();
     return 1;
   }
 
@@ -109,14 +219,20 @@ class DatabaseHelper {
     recData.remove('id');
     await _client.from('recipes').update(recData).eq('id', recipe.id!);
 
-    // Recreate ingredients
+    // Recreate ingredients em batch
     await _client.from('recipe_ingredients').delete().eq('recipeid', recipe.id!);
-    for (var ri in recipe.ingredients) {
-      ri.recipeId = recipe.id!;
-      var riData = ri.toMap();
-      riData.remove('id');
-      await _client.from('recipe_ingredients').insert(riData);
+    if (recipe.ingredients.isNotEmpty) {
+      final List<Map<String, dynamic>> riDataList = [];
+      for (var ri in recipe.ingredients) {
+        ri.recipeId = recipe.id!;
+        var riData = ri.toMap();
+        riData.remove('id');
+        riDataList.add(riData);
+      }
+      await _client.from('recipe_ingredients').insert(riDataList);
     }
+    clearRecipesCache();
+    clearProductsCache();
     return 1;
   }
 
@@ -128,22 +244,57 @@ class DatabaseHelper {
     final newProdId = response['id'] as int;
     product.id = newProdId;
     
-    for (var pr in product.recipes) {
-      pr.productId = newProdId;
-      var prData = pr.toMap();
-      prData.remove('id');
-      await _client.from('product_recipes').insert(prData);
+    if (product.recipes.isNotEmpty) {
+      final List<Map<String, dynamic>> prDataList = [];
+      for (var pr in product.recipes) {
+        pr.productId = newProdId;
+        var prData = pr.toMap();
+        prData.remove('id');
+        prDataList.add(prData);
+      }
+      await _client.from('product_recipes').insert(prDataList);
     }
-    for (var pe in product.extraExpenses) {
-      pe.productId = newProdId;
-      var peData = pe.toMap();
-      peData.remove('id');
-      await _client.from('product_expenses').insert(peData);
+    if (product.extraExpenses.isNotEmpty) {
+      final List<Map<String, dynamic>> peDataList = [];
+      for (var pe in product.extraExpenses) {
+        pe.productId = newProdId;
+        var peData = pe.toMap();
+        peData.remove('id');
+        peDataList.add(peData);
+      }
+      await _client.from('product_expenses').insert(peDataList);
     }
+    clearProductsCache();
     return product;
   }
 
-  Future<List<Product>> readAllProducts() async {
+  Future<List<Product>> readAllProducts({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedProducts != null) {
+      return _cachedProducts!;
+    }
+    if (_inFlightProducts != null) {
+      return _inFlightProducts!;
+    }
+
+    _inFlightProducts = _fetchProducts();
+    try {
+      final res = await _inFlightProducts!;
+      _cachedProducts = res;
+      // Atualizar também o cache de imagens para evitar query duplicada
+      final imgMap = <int, String>{};
+      for (var p in res) {
+        if (p.id != null && p.imagePath.isNotEmpty) {
+          imgMap[p.id!] = p.imagePath;
+        }
+      }
+      _cachedProductImages = imgMap;
+      return res;
+    } finally {
+      _inFlightProducts = null;
+    }
+  }
+
+  Future<List<Product>> _fetchProducts() async {
     final results = await Future.wait([
       _client.from('products').select().order('name', ascending: true),
       _client.from('product_recipes').select(),
@@ -190,7 +341,37 @@ class DatabaseHelper {
     return products;
   }
 
-  Future<Map<int, String>> getProductImages() async {
+  Future<Map<int, String>> getProductImages({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedProductImages != null) {
+      return _cachedProductImages!;
+    }
+    // Se produtos já estão em cache, derive direto sem fazer requisição de rede
+    if (_cachedProducts != null) {
+      final map = <int, String>{};
+      for (var p in _cachedProducts!) {
+        if (p.id != null && p.imagePath.isNotEmpty) {
+          map[p.id!] = p.imagePath;
+        }
+      }
+      _cachedProductImages = map;
+      return map;
+    }
+
+    if (_inFlightProductImages != null) {
+      return _inFlightProductImages!;
+    }
+
+    _inFlightProductImages = _fetchProductImages();
+    try {
+      final res = await _inFlightProductImages!;
+      _cachedProductImages = res;
+      return res;
+    } finally {
+      _inFlightProductImages = null;
+    }
+  }
+
+  Future<Map<int, String>> _fetchProductImages() async {
     try {
       final response = await _client.from('products').select('id, imagepath');
       final map = <int, String>{};
@@ -209,6 +390,7 @@ class DatabaseHelper {
     await _client.from('product_recipes').delete().eq('productid', id);
     await _client.from('product_expenses').delete().eq('productid', id);
     await _client.from('products').delete().eq('id', id);
+    clearProductsCache();
     return 1;
   }
 
@@ -219,38 +401,78 @@ class DatabaseHelper {
 
     // Recreate recipes
     await _client.from('product_recipes').delete().eq('productid', product.id!);
-    for (var pr in product.recipes) {
-      pr.productId = product.id!;
-      var prData = pr.toMap();
-      prData.remove('id');
-      await _client.from('product_recipes').insert(prData);
+    if (product.recipes.isNotEmpty) {
+      final List<Map<String, dynamic>> prDataList = [];
+      for (var pr in product.recipes) {
+        pr.productId = product.id!;
+        var prData = pr.toMap();
+        prData.remove('id');
+        prDataList.add(prData);
+      }
+      await _client.from('product_recipes').insert(prDataList);
     }
 
     // Recreate expenses
     await _client.from('product_expenses').delete().eq('productid', product.id!);
-    for (var pe in product.extraExpenses) {
-      pe.productId = product.id!;
-      var peData = pe.toMap();
-      peData.remove('id');
-      await _client.from('product_expenses').insert(peData);
+    if (product.extraExpenses.isNotEmpty) {
+      final List<Map<String, dynamic>> peDataList = [];
+      for (var pe in product.extraExpenses) {
+        pe.productId = product.id!;
+        var peData = pe.toMap();
+        peData.remove('id');
+        peDataList.add(peData);
+      }
+      await _client.from('product_expenses').insert(peDataList);
     }
+    clearProductsCache();
     return 1;
   }
 
   // --- SETTINGS ---
   Future<void> saveSetting(String key, String value) async {
     await _client.from('settings').upsert({'key': key, 'value': value});
+    if (_cachedSettings != null) {
+      _cachedSettings![key] = value;
+    }
   }
 
   Future<String?> getSetting(String key) async {
-    final response = await _client.from('settings').select('value').eq('key', key).maybeSingle();
-    if (response != null) {
-      return response['value'] as String;
+    if (_cachedSettings != null && _cachedSettings!.containsKey(key)) {
+      return _cachedSettings![key];
     }
+    try {
+      final response = await _client.from('settings').select('value').eq('key', key).maybeSingle();
+      if (response != null) {
+        final val = response['value'] as String?;
+        if (val != null) {
+          _cachedSettings ??= {};
+          _cachedSettings![key] = val;
+        }
+        return val;
+      }
+    } catch (_) {}
     return null;
   }
 
-  Future<Map<String, String>> getAllSettings() async {
+  Future<Map<String, String>> getAllSettings({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedSettings != null) {
+      return _cachedSettings!;
+    }
+    if (_inFlightSettings != null) {
+      return _inFlightSettings!;
+    }
+
+    _inFlightSettings = _fetchAllSettings();
+    try {
+      final res = await _inFlightSettings!;
+      _cachedSettings = res;
+      return res;
+    } finally {
+      _inFlightSettings = null;
+    }
+  }
+
+  Future<Map<String, String>> _fetchAllSettings() async {
     try {
       final response = await _client.from('settings').select();
       final map = <String, String>{};
@@ -270,18 +492,62 @@ class DatabaseHelper {
     var data = sale.toMap();
     data.remove('id');
     final response = await _client.from('sales').insert(data).select().single();
+    clearSalesCache();
     return Sale.fromMap(response);
   }
 
-  Future<List<Sale>> readAllSales() async {
+  Future<List<Sale>> readAllSales({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedSales != null) {
+      return _cachedSales!;
+    }
+    if (_inFlightSales != null) {
+      return _inFlightSales!;
+    }
+
+    _inFlightSales = _fetchSales();
+    try {
+      final res = await _inFlightSales!;
+      _cachedSales = res;
+      return res;
+    } finally {
+      _inFlightSales = null;
+    }
+  }
+
+  Future<List<Sale>> _fetchSales() async {
     final response = await _client.from('sales').select().order('saledate', ascending: false);
     return response.map<Sale>((json) => Sale.fromMap(json)).toList();
   }
 
+  /// Busca de vendas otimizada para vendedor: filtra no banco ao invés de baixar a base inteira!
+  Future<List<Sale>> readSalesForSeller(String sellerName, {bool forceRefresh = false}) async {
+    final key = sellerName.trim().toLowerCase();
+    if (!forceRefresh && _cachedSellerSales.containsKey(key)) {
+      return _cachedSellerSales[key]!;
+    }
+
+    try {
+      final response = await _client
+          .from('sales')
+          .select()
+          .ilike('sellername', sellerName.trim())
+          .order('saledate', ascending: false);
+      final list = response.map<Sale>((json) => Sale.fromMap(json)).toList();
+      _cachedSellerSales[key] = list;
+      return list;
+    } catch (e) {
+      debugPrint('Erro ao buscar vendas do vendedor: $e');
+      return [];
+    }
+  }
+
   Future<int> deleteSale(int id) async {
     await _client.from('sales').delete().eq('id', id);
+    clearSalesCache();
     return 1;
-  }  Future close() async {
+  }
+
+  Future close() async {
     // No-op for Supabase
   }
 
@@ -291,7 +557,25 @@ class DatabaseHelper {
   }
 
   // --- REFRIGERATOR STOCK CRUD ---
-  Future<List<RefrigeratorItem>> readRefrigeratorStock() async {
+  Future<List<RefrigeratorItem>> readRefrigeratorStock({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedStock != null) {
+      return _cachedStock!;
+    }
+    if (_inFlightStock != null) {
+      return _inFlightStock!;
+    }
+
+    _inFlightStock = _fetchRefrigeratorStock();
+    try {
+      final res = await _inFlightStock!;
+      _cachedStock = res;
+      return res;
+    } finally {
+      _inFlightStock = null;
+    }
+  }
+
+  Future<List<RefrigeratorItem>> _fetchRefrigeratorStock() async {
     final response = await _client.from('refrigerator_stock').select().order('name', ascending: true);
     return response.map<RefrigeratorItem>((json) => RefrigeratorItem.fromMap(json)).toList();
   }
@@ -301,6 +585,7 @@ class DatabaseHelper {
     data.remove('id');
     data.remove('last_updated');
     final response = await _client.from('refrigerator_stock').insert(data).select().single();
+    clearStockCache();
     return RefrigeratorItem.fromMap(response);
   }
 
@@ -309,11 +594,13 @@ class DatabaseHelper {
     data.remove('id');
     data.remove('last_updated');
     await _client.from('refrigerator_stock').update(data).eq('id', item.id!);
+    clearStockCache();
     return 1;
   }
 
   Future<int> deleteRefrigeratorItem(int id) async {
     await _client.from('refrigerator_stock').delete().eq('id', id);
+    clearStockCache();
     return 1;
   }
 
@@ -337,8 +624,7 @@ class DatabaseHelper {
         await updateRefrigeratorItem(item);
       }
     } catch (e) {
-      // Falha silenciosa para não quebrar o fluxo de salvar venda
-      print('Erro ao deduzir estoque: $e');
+      debugPrint('Erro ao deduzir estoque: $e');
     }
   }
 
@@ -350,7 +636,7 @@ class DatabaseHelper {
         return Profile.fromMap(response);
       }
     } catch (e) {
-      print('Erro ao buscar perfil: $e');
+      debugPrint('Erro ao buscar perfil: $e');
     }
     return null;
   }
@@ -359,7 +645,7 @@ class DatabaseHelper {
     try {
       await _client.from('profiles').insert(profile.toMap());
     } catch (e) {
-      print('Erro ao criar perfil: $e');
+      debugPrint('Erro ao criar perfil: $e');
     }
   }
 
@@ -368,7 +654,7 @@ class DatabaseHelper {
       final response = await _client.rpc('get_sellers_with_emails');
       return (response as List).map<Profile>((json) => Profile.fromMap(json)).toList();
     } catch (e) {
-      print('Erro ao obter vendedores por RPC, tentando fallback: $e');
+      debugPrint('Erro ao obter vendedores por RPC, tentando fallback: $e');
       final response = await _client.from('profiles').select().eq('role', 'seller').order('name');
       return response.map<Profile>((json) => Profile.fromMap(json)).toList();
     }
@@ -386,6 +672,7 @@ class DatabaseHelper {
           .from('sales')
           .update({'sellername': newName.trim()})
           .ilike('sellername', oldName.trim());
+      clearSalesCache();
     }
   }
 
@@ -434,7 +721,7 @@ class DatabaseHelper {
         });
       }
     } catch (e) {
-      print('Erro ao adicionar estoque consignado do vendedor: $e');
+      debugPrint('Erro ao adicionar estoque consignado do vendedor: $e');
     }
   }
 
@@ -462,7 +749,7 @@ class DatabaseHelper {
             .eq('product_id', productId);
       }
     } catch (e) {
-      print('Erro ao deduzir estoque consignado do vendedor: $e');
+      debugPrint('Erro ao deduzir estoque consignado do vendedor: $e');
     }
   }
 
@@ -513,7 +800,7 @@ class DatabaseHelper {
         await addSellerStock(sellerId, productId, qty);
       }
     } catch (e) {
-      print('Erro ao entregar pedido: $e');
+      debugPrint('Erro ao entregar pedido: $e');
     }
   }
 }

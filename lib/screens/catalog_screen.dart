@@ -1,13 +1,13 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/product.dart';
 import '../database/db_helper.dart';
 import 'add_product_screen.dart';
+import '../widgets/app_cached_image.dart';
 
 class CatalogScreen extends StatefulWidget {
-  const CatalogScreen({Key? key}) : super(key: key);
+  const CatalogScreen({super.key});
 
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
@@ -15,6 +15,8 @@ class CatalogScreen extends StatefulWidget {
 
 class _CatalogScreenState extends State<CatalogScreen> {
   List<Product> _products = [];
+  Map<String, List<Product>> _groupedProducts = {};
+  List<String> _categories = [];
   bool _isLoading = true;
 
   @override
@@ -28,9 +30,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
     setState(() => _isLoading = true);
     try {
       final prods = await DatabaseHelper.instance.readAllProducts();
+      final Map<String, List<Product>> grouped = {};
+      for (var product in prods) {
+        final cat = product.category.trim().isEmpty ? 'Geral' : product.category.trim();
+        grouped.putIfAbsent(cat, () => []).add(product);
+      }
       if (mounted) {
         setState(() {
           _products = prods;
+          _groupedProducts = grouped;
+          _categories = grouped.keys.toList();
         });
       }
     } catch (e) {
@@ -40,16 +49,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  Map<String, List<Product>> _getGroupedProducts() {
-    final Map<String, List<Product>> grouped = {};
-    for (var product in _products) {
-      final cat = product.category;
-      if (!grouped.containsKey(cat)) grouped[cat] = [];
-      grouped[cat]!.add(product);
-    }
-    return grouped;
   }
 
   String _getPlaceholderImage(int index) {
@@ -113,10 +112,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       ? Center(child: Text('Nenhum produto cadastrado.', style: Theme.of(context).textTheme.bodyMedium))
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _getGroupedProducts().length,
+                          itemCount: _categories.length,
                           itemBuilder: (context, index) {
-                            final category = _getGroupedProducts().keys.elementAt(index);
-                            final categoryProducts = _getGroupedProducts()[category]!;
+                            final category = _categories[index];
+                            final categoryProducts = _groupedProducts[category] ?? [];
 
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +134,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                 ),
                                 ...categoryProducts.map((product) {
                                   product.calculateSuggestedPrice();
-                                  final imageUrl = product.imagePath.isNotEmpty ? product.imagePath : _getPlaceholderImage(_products.indexOf(product));
+                                  final imageUrl = product.imagePath.isNotEmpty ? product.imagePath : _getPlaceholderImage(product.id ?? 0);
 
                                   return InkWell(
                                     onTap: () async {
@@ -152,7 +151,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                         borderRadius: BorderRadius.circular(16),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
+                                            color: Colors.black.withValues(alpha: 0.1),
                                             blurRadius: 10,
                                             offset: const Offset(0, 4),
                                           )
@@ -162,17 +161,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                         borderRadius: BorderRadius.circular(16),
                                         child: Stack(
                                           children: [
-                                            // Imagem de fundo real (trata network ou base64)
+                                            // Imagem de fundo real com AppCachedImage
                                             Positioned.fill(
-                                              child: imageUrl.startsWith('data:')
-                                                  ? Image.memory(
-                                                      base64Decode(imageUrl.split(',').last),
-                                                      fit: BoxFit.cover,
-                                                    )
-                                                  : Image.network(
-                                                      imageUrl,
-                                                      fit: BoxFit.cover,
-                                                    ),
+                                              child: AppCachedImage(
+                                                imageUrl: imageUrl,
+                                                fit: BoxFit.cover,
+                                                cacheWidth: 600,
+                                                cacheHeight: 400,
+                                              ),
                                             ),
                                             // Gradiente escuro em baixo
                                             Positioned(

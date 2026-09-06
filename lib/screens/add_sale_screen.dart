@@ -7,7 +7,7 @@ import '../models/profile.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddSaleScreen extends StatefulWidget {
-  const AddSaleScreen({Key? key}) : super(key: key);
+  const AddSaleScreen({super.key});
 
   @override
   State<AddSaleScreen> createState() => _AddSaleScreenState();

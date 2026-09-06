@@ -6,7 +6,7 @@ import '../models/product.dart';
 import '../models/recipe.dart';
 
 class RefrigeratorStockScreen extends StatefulWidget {
-  const RefrigeratorStockScreen({Key? key}) : super(key: key);
+  const RefrigeratorStockScreen({super.key});
 
   @override
   State<RefrigeratorStockScreen> createState() => _RefrigeratorStockScreenState();

@@ -15,7 +15,7 @@ import 'admin_orders_panel_screen.dart';
 import 'admin_sellers_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();

@@ -6,7 +6,7 @@ class AddIngredientSheet extends StatefulWidget {
   final Ingredient? ingredient;
   final VoidCallback onSaved;
 
-  const AddIngredientSheet({Key? key, this.ingredient, required this.onSaved}) : super(key: key);
+  const AddIngredientSheet({super.key, this.ingredient, required this.onSaved});
 
   @override
   State<AddIngredientSheet> createState() => _AddIngredientSheetState();
@@ -52,7 +52,9 @@ class _AddIngredientSheetState extends State<AddIngredientSheet> {
         await DatabaseHelper.instance.updateIngredient(ingredient);
       }
       widget.onSaved();
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
     }
   }
 
@@ -115,7 +117,7 @@ class _AddIngredientSheetState extends State<AddIngredientSheet> {
 
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 decoration: const InputDecoration(labelText: 'Tipo', border: OutlineInputBorder()),
                 items: const [
                   DropdownMenuItem(value: 'ingredient', child: Text('Ingrediente')),

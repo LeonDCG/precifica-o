@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,10 +5,11 @@ import '../models/profile.dart';
 import '../models/sale.dart';
 import '../database/db_helper.dart';
 import 'login_screen.dart';
+import '../widgets/app_cached_image.dart';
 
 class SellerDashboard extends StatefulWidget {
   final Profile profile;
-  const SellerDashboard({Key? key, required this.profile}) : super(key: key);
+  const SellerDashboard({super.key, required this.profile});
 
   @override
   State<SellerDashboard> createState() => _SellerDashboardState();
@@ -36,29 +36,25 @@ class _SellerDashboardState extends State<SellerDashboard> {
       final results = await Future.wait([
         DatabaseHelper.instance.getSellerStock(widget.profile.id),
         DatabaseHelper.instance.getProductImages(),
-        DatabaseHelper.instance.readAllSales(),
+        DatabaseHelper.instance.readSalesForSeller(widget.profile.name),
       ]);
 
       _consignedStock = results[0] as List<Map<String, dynamic>>;
       final images = results[1] as Map<int, String>;
       final sales = results[2] as List<Sale>;
 
-      final List<Sale> filteredSales = [];
       double commissionSum = 0.0;
-
-      final profileName = widget.profile.name.trim().toLowerCase();
       for (var s in sales) {
-        if (s.sellerName.trim().toLowerCase() == profileName) {
-          filteredSales.add(s);
-          commissionSum += s.commissionValue;
-        }
+        commissionSum += s.commissionValue;
       }
 
-      setState(() {
-        _sellerSales = filteredSales;
-        _productImages = images;
-        _monthlyCommission = commissionSum;
-      });
+      if (mounted) {
+        setState(() {
+          _sellerSales = sales;
+          _productImages = images;
+          _monthlyCommission = commissionSum;
+        });
+      }
     } catch (e) {
       debugPrint('Erro ao carregar dados do vendedor: $e');
     } finally {
@@ -243,22 +239,19 @@ class _SellerDashboardState extends State<SellerDashboard> {
                                     borderRadius: BorderRadius.circular(16),
                                     child: Stack(
                                       children: [
-                                        // Background Image
+                                        // Background Image otimizada com AppCachedImage
                                         Positioned.fill(
-                                          child: imageUrl.startsWith('data:')
-                                              ? Image.memory(
-                                                  base64Decode(imageUrl.split(',').last),
-                                                  fit: BoxFit.cover,
-                                                )
-                                              : Image.network(
-                                                  imageUrl,
-                                                  fit: BoxFit.cover,
-                                                ),
+                                          child: AppCachedImage(
+                                            imageUrl: imageUrl,
+                                            fit: BoxFit.cover,
+                                            cacheWidth: 500,
+                                            cacheHeight: 300,
+                                          ),
                                         ),
                                         // Dark overlay
                                         Positioned.fill(
                                           child: Container(
-                                            color: Colors.black.withOpacity(0.65),
+                                            color: Colors.black.withValues(alpha: 0.65),
                                           ),
                                         ),
                                         
