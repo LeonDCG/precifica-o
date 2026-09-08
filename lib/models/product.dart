@@ -68,15 +68,15 @@ class Product {
   factory Product.fromMap(Map<String, dynamic> map) {
     return Product(
       id: map['id'],
-      name: map['name'],
-      suggestedPrice: (map['suggestedPrice'] as num).toDouble(),
-      sellPrice: (map['sellPrice'] as num).toDouble(),
-      profitMarginPercent: (map['profitMarginPercent'] as num).toDouble(),
-      imagePath: map['imagePath'] ?? '',
-      isFeatured: (map['isFeatured'] ?? 0) == 1,
+      name: map['name'] ?? '',
+      suggestedPrice: ((map['suggestedPrice'] ?? map['suggestedprice'] ?? 0.0) as num).toDouble(),
+      sellPrice: ((map['sellPrice'] ?? map['sellprice'] ?? 0.0) as num).toDouble(),
+      profitMarginPercent: ((map['profitMarginPercent'] ?? map['profitmarginpercent'] ?? 30.0) as num).toDouble(),
+      imagePath: map['imagePath'] ?? map['imagepath'] ?? '',
+      isFeatured: (map['isFeatured'] ?? map['isfeatured'] ?? 0) == 1,
       category: map['category'] ?? 'Geral',
       unit: map['unit'] ?? 'unidade',
-      yieldAmount: (map['yieldAmount'] as num?)?.toDouble() ?? 1.0,
+      yieldAmount: ((map['yieldAmount'] ?? map['yieldamount'] ?? 1.0) as num).toDouble(),
     );
   }
 }

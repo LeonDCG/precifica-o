@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../database/db_helper.dart';
 import '../models/product.dart';
+import '../models/sale.dart';
 import 'login_screen.dart';
 import 'add_recipe_screen.dart';
 import 'add_product_screen.dart';

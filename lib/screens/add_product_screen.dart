@@ -54,16 +54,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    final results = await Future.wait([
-      DatabaseHelper.instance.readAllRecipes(),
-      DatabaseHelper.instance.getCategories(),
-    ]);
-    
-    if (mounted) {
-      setState(() {
-        _availableRecipes = results[0] as List<Recipe>;
-        _existingCategories = results[1] as List<String>;
-      });
+    try {
+      final results = await Future.wait([
+        DatabaseHelper.instance.readAllRecipes(),
+        DatabaseHelper.instance.getCategories(),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _availableRecipes = results[0] as List<Recipe>;
+          _existingCategories = results[1] as List<String>;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar dados iniciais em AddProductScreen: $e');
     }
   }
 
