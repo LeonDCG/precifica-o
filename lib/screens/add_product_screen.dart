@@ -23,6 +23,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   double _yieldAmount = 1.0;
   double _profitMarginPercent = 30.0;
   double _sellPrice = 0.0;
+  double _ifoodPrice = 0.0;
+  late TextEditingController _ifoodPriceController;
   String _imagePath = '';
 
   final ImagePicker _picker = ImagePicker();
@@ -43,14 +45,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _yieldAmount = widget.product!.yieldAmount;
       _profitMarginPercent = widget.product!.profitMarginPercent;
       _sellPrice = widget.product!.sellPrice;
+      _ifoodPrice = widget.product!.ifoodPrice;
       _imagePath = widget.product!.imagePath;
       _selectedRecipes.addAll(widget.product!.recipes);
       _expenses.addAll(widget.product!.extraExpenses);
     }
+    _ifoodPriceController = TextEditingController(
+      text: _ifoodPrice > 0 ? _ifoodPrice.toStringAsFixed(2) : '',
+    );
     if (DatabaseHelper.instance.cachedRecipes != null) {
       _availableRecipes = DatabaseHelper.instance.cachedRecipes!;
     }
     _loadInitialData();
+  }
+
+  @override
+  void dispose() {
+    _ifoodPriceController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadInitialData() async {
@@ -237,6 +249,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         yieldAmount: _yieldAmount,
         profitMarginPercent: _profitMarginPercent,
         sellPrice: _sellPrice,
+        ifoodPrice: _ifoodPrice,
         recipes: _selectedRecipes,
         extraExpenses: _expenses,
         imagePath: _imagePath,
@@ -564,7 +577,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              isPositive ? '4. SEU LUCRO PROJETADO' : '4. PREJUÍZO DETECTADO',
+                              isPositive ? '4. SEU LUCRO PROJETADO (LOJA/BALCÃO)' : '4. PREJUÍZO DETECTADO',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
@@ -615,6 +628,134 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       );
                     }
                   ),
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12.0),
+                    child: Divider(thickness: 1.5),
+                  ),
+
+                  // Seção iFood
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEA1D2C),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.delivery_dining, color: Colors.white, size: 16),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '5. PREÇO DE VENDA NO IFOOD',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFEA1D2C),
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: const Icon(Icons.auto_awesome, size: 14, color: Color(0xFFEA1D2C)),
+                        label: const Text(
+                          'Sugerir (+27%)',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEA1D2C)),
+                        ),
+                        onPressed: () {
+                          final base = _sellPrice > 0 ? _sellPrice : _currentSuggestedPrice;
+                          if (base > 0) {
+                            final suggested = base / 0.73; // cobre os 27% para sobrar o valor do balcão líquido
+                            setState(() {
+                              _ifoodPrice = double.parse(suggested.toStringAsFixed(2));
+                              _ifoodPriceController.text = _ifoodPrice.toStringAsFixed(2);
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _ifoodPriceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Preço Praticado no Cardápio iFood (R\$)',
+                      hintText: 'Ex: 68,50 (Deixe em branco para usar preço de balcão)',
+                      border: OutlineInputBorder(),
+                      prefixText: 'R\$ ',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (v) {
+                      setState(() {
+                        _ifoodPrice = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                      });
+                    },
+                  ),
+                  if (_ifoodPrice > 0) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEA1D2C).withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFEA1D2C).withValues(alpha: 0.25)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Taxa iFood Plano Entrega (27%):', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text('- R\$ ${(_ifoodPrice * 0.27).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFEA1D2C))),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Repasse Líquido Estimado:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text('R\$ ${(_ifoodPrice * 0.73).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue)),
+                            ],
+                          ),
+                          const Divider(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Seu Lucro Real no iFood:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(
+                                'R\$ ${((_ifoodPrice * 0.73) - _currentTotalCost).toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: ((_ifoodPrice * 0.73) - _currentTotalCost) >= 0 ? Colors.green[800] : Colors.red[800],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_yieldAmount > 1) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Preço por $_unit no iFood:', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text('R\$ ${(_ifoodPrice / _yieldAmount).toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

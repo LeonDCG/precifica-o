@@ -50,5 +50,29 @@ void main() {
       product.calculateSuggestedPrice();
       expect(product.suggestedPrice, equals(60.0)); // 30 * (1 + 100/100) = 60
     });
+
+    test('ifoodPrice serialization and effectiveIfoodPrice fallback', () {
+      final productWithIfood = Product(
+        name: 'Torta Trufada',
+        sellPrice: 50.0,
+        ifoodPrice: 68.50,
+      );
+
+      expect(productWithIfood.effectiveIfoodPrice, equals(68.50));
+
+      final map = productWithIfood.toMap();
+      expect(map['ifoodPrice'], equals(68.50));
+
+      final fromMapProd = Product.fromMap(map);
+      expect(fromMapProd.ifoodPrice, equals(68.50));
+      expect(fromMapProd.effectiveIfoodPrice, equals(68.50));
+
+      final productWithoutIfood = Product(
+        name: 'Bolo Simples',
+        sellPrice: 40.0,
+        ifoodPrice: 0.0,
+      );
+      expect(productWithoutIfood.effectiveIfoodPrice, equals(40.0));
+    });
   });
 }

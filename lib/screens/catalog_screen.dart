@@ -248,6 +248,48 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                                       );
                                                     }
                                                   ),
+                                                  const SizedBox(height: 6),
+                                                  // Selo / Botão Preço iFood
+                                                  GestureDetector(
+                                                    onTap: () => _showIfoodPriceDialog(product),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: product.ifoodPrice > 0 ? const Color(0xFFEA1D2C) : Colors.black.withValues(alpha: 0.65),
+                                                        borderRadius: BorderRadius.circular(20),
+                                                        border: product.ifoodPrice > 0
+                                                            ? null
+                                                            : Border.all(color: const Color(0xFFEA1D2C).withValues(alpha: 0.7), width: 1),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black.withValues(alpha: 0.2),
+                                                            blurRadius: 4,
+                                                            offset: const Offset(0, 2),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          const Icon(Icons.delivery_dining, color: Colors.white, size: 13),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            product.ifoodPrice > 0
+                                                                ? 'iFood: R\$ ${product.ifoodPrice.toStringAsFixed(2)}'
+                                                                : '+ Preço iFood',
+                                                            style: const TextStyle(
+                                                              color: Colors.white,
+                                                              fontSize: 9.5,
+                                                              fontWeight: FontWeight.bold,
+                                                              letterSpacing: 0.4,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 3),
+                                                          const Icon(Icons.edit, color: Colors.white70, size: 10),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
                                             ),
@@ -269,7 +311,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                           ),
                                           // Botão WhatsApp Share
                                           Positioned(
-                                            top: 12, right: 56,
+                                            top: 12, right: 52,
                                             child: CircleAvatar(
                                               radius: 16,
                                               backgroundColor: Colors.white,
@@ -284,10 +326,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                                   msg += '🎂 *${product.name}*\n';
                                                   if (product.yieldAmount > 1) {
                                                     msg += '📦 Rende: ${product.yieldAmount.toInt()} ${product.unit}(s)\n';
-                                                    msg += '💰 Valor Total: R\$ ${total.toStringAsFixed(2)}\n';
+                                                    msg += '💰 Valor Total (Loja): R\$ ${total.toStringAsFixed(2)}\n';
                                                     msg += '💵 Valor / ${product.unit}: R\$ $fraction\n';
                                                   } else {
-                                                    msg += '💰 Valor: R\$ ${total.toStringAsFixed(2)} / ${product.unit}\n';
+                                                    msg += '💰 Valor (Loja): R\$ ${total.toStringAsFixed(2)} / ${product.unit}\n';
+                                                  }
+                                                  if (product.ifoodPrice > 0) {
+                                                    msg += '🛵 Valor no iFood: R\$ ${product.ifoodPrice.toStringAsFixed(2)}\n';
                                                   }
                                                   msg += '\nGostaria de fazer uma encomenda?';
                                                   
@@ -296,6 +341,24 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                                     await launchUrl(url);
                                                   }
                                                 },
+                                              ),
+                                            ),
+                                          ),
+                                          // Botão iFood Preço Rápido
+                                          Positioned(
+                                            top: 12, right: 92,
+                                            child: CircleAvatar(
+                                              radius: 16,
+                                              backgroundColor: product.ifoodPrice > 0 ? const Color(0xFFEA1D2C) : Colors.white,
+                                              child: IconButton(
+                                                padding: EdgeInsets.zero,
+                                                tooltip: 'Preço no iFood',
+                                                icon: Icon(
+                                                  Icons.delivery_dining,
+                                                  size: 16,
+                                                  color: product.ifoodPrice > 0 ? Colors.white : const Color(0xFFEA1D2C),
+                                                ),
+                                                onPressed: () => _showIfoodPriceDialog(product),
                                               ),
                                             ),
                                           ),
@@ -345,6 +408,18 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                                         '/ ${product.unit}',
                                                         style: const TextStyle(color: Colors.white70, fontSize: 12),
                                                       ),
+                                                    if (product.ifoodPrice > 0)
+                                                      Padding(
+                                                        padding: const EdgeInsets.only(top: 2),
+                                                        child: Text(
+                                                          'iFood: R\$ ${product.ifoodPrice.toStringAsFixed(2)}',
+                                                          style: const TextStyle(
+                                                            color: Color(0xFFFF8A80),
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
                                                   ],
                                                 ),
                                               ],
@@ -366,4 +441,254 @@ class _CatalogScreenState extends State<CatalogScreen> {
     );
   }
 
+  Future<void> _showIfoodPriceDialog(Product product) async {
+    final basePrice = product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice;
+    final controller = TextEditingController(
+      text: product.ifoodPrice > 0 ? product.ifoodPrice.toStringAsFixed(2) : '',
+    );
+    double currentInputPrice = product.ifoodPrice > 0 ? product.ifoodPrice : 0.0;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Sugestão com base na taxa padrão de 27% (Plano Entrega iFood)
+            // Preço iFood = Preço Loja / 0.73 para cobrir os 27%
+            final suggestedIfood = basePrice > 0 ? (basePrice / 0.73) : 0.0;
+            
+            final retention27 = currentInputPrice * 0.27;
+            final netPayout = currentInputPrice * 0.73;
+            final netProfit = netPayout - product.totalCost;
+            final isProfitPositive = netProfit >= 0;
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              titlePadding: EdgeInsets.zero,
+              title: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEA1D2C), // iFood Red
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.delivery_dining, color: Colors.white, size: 28),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Preço de Venda iFood',
+                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            product.name,
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Info de balcão
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Preço Balcão (Loja):', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text(
+                                'R\$ ${basePrice.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text('Custo Produção:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text(
+                                'R\$ ${product.totalCost.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Botão de sugestão automática
+                    if (basePrice > 0) ...[
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFEA1D2C),
+                          side: const BorderSide(color: Color(0xFFEA1D2C)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        icon: const Icon(Icons.auto_awesome, size: 16),
+                        label: Text('Sugerir R\$ ${suggestedIfood.toStringAsFixed(2)} (+27% iFood)'),
+                        onPressed: () {
+                          setDialogState(() {
+                            currentInputPrice = suggestedIfood;
+                            controller.text = suggestedIfood.toStringAsFixed(2);
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Campo de Preço iFood
+                    TextField(
+                      controller: controller,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Preço Praticado no iFood (R\$)',
+                        hintText: 'Ex: 68.50',
+                        prefixText: 'R\$ ',
+                        border: OutlineInputBorder(),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFFEA1D2C), width: 2),
+                        ),
+                      ),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          currentInputPrice = double.tryParse(val.replaceAll(',', '.')) ?? 0.0;
+                        });
+                      },
+                    ),
+
+                    if (currentInputPrice > 0) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEA1D2C).withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEA1D2C).withValues(alpha: 0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'SIMULAÇÃO DE REPASSE (PLANO ENTREGA 27%):',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFEA1D2C),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Comissão iFood (27%):', style: TextStyle(fontSize: 12)),
+                                Text('- R\$ ${retention27.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Repasse Líquido iFood (73%):', style: TextStyle(fontSize: 12)),
+                                Text('R\$ ${netPayout.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                            const Divider(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Lucro Líquido Real:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                Text(
+                                  'R\$ ${netProfit.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: isProfitPositive ? Colors.green[700] : Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                if (product.ifoodPrice > 0)
+                  TextButton(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await DatabaseHelper.instance.updateProductIfoodPrice(product.id!, 0.0);
+                      setState(() {
+                        product.ifoodPrice = 0.0;
+                      });
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Preço iFood removido de ${product.name}')),
+                        );
+                      }
+                      _refreshProducts(forceRefresh: true);
+                    },
+                    child: const Text('Remover', style: TextStyle(color: Colors.red)),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEA1D2C),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () async {
+                    final newPrice = double.tryParse(controller.text.replaceAll(',', '.')) ?? 0.0;
+                    Navigator.pop(ctx);
+                    await DatabaseHelper.instance.updateProductIfoodPrice(product.id!, newPrice);
+                    setState(() {
+                      product.ifoodPrice = newPrice;
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Preço iFood de ${product.name} atualizado para R\$ ${newPrice.toStringAsFixed(2)}!'),
+                          backgroundColor: const Color(0xFFEA1D2C),
+                        ),
+                      );
+                    }
+                    _refreshProducts(forceRefresh: true);
+                  },
+                  child: const Text('Salvar Preço'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 }
+

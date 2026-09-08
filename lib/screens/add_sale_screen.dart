@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../models/product.dart';
 import '../models/sale.dart';
 import '../database/db_helper.dart';
@@ -81,7 +80,12 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
 
   double get _productPrice {
     if (_selectedProduct == null) return 0.0;
-    double basePrice = _selectedProduct!.sellPrice > 0 ? _selectedProduct!.sellPrice : _selectedProduct!.suggestedPrice;
+    double basePrice;
+    if (_sellerType == 'ifood' && _selectedProduct!.ifoodPrice > 0) {
+      basePrice = _selectedProduct!.ifoodPrice;
+    } else {
+      basePrice = _selectedProduct!.sellPrice > 0 ? _selectedProduct!.sellPrice : _selectedProduct!.suggestedPrice;
+    }
     if (_saleUnitType == 'unit') {
       return basePrice / _selectedProduct!.yieldAmount;
     } else {
@@ -287,7 +291,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                 children: [
                   Expanded(
                     child: TextFormField(
-                      key: ValueKey('${_selectedProduct!.id}_${_saleUnitType}'),
+                      key: ValueKey('${_selectedProduct!.id}_$_saleUnitType'),
                       initialValue: _quantity.toString(),
                       decoration: InputDecoration(
                         labelText: 'Qtd Vendida (${_saleUnitType == 'unit' ? _selectedProduct!.unit : 'inteiro'})',
@@ -305,11 +309,11 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: TextFormField(
-                      key: ValueKey(_selectedProduct!.id),
+                      key: ValueKey('${_selectedProduct!.id}_${_sellerType}_$_saleUnitType'),
                       initialValue: _productPrice.toStringAsFixed(2),
-                      decoration: const InputDecoration(
-                        labelText: 'Preço Praticado (R\$)',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: _sellerType == 'ifood' ? 'Preço iFood (R\$)' : 'Preço Praticado (R\$)',
+                        border: const OutlineInputBorder(),
                         prefixText: 'R\$ ',
                       ),
                       keyboardType: TextInputType.number,
@@ -351,7 +355,10 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                   children: [
                     Expanded(
                       child: InkWell(
-                        onTap: () => setState(() => _sellerType = 'me'),
+                        onTap: () => setState(() {
+                          _sellerType = 'me';
+                          _customSellPrice = 0.0;
+                        }),
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -387,7 +394,10 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: InkWell(
-                        onTap: () => setState(() => _sellerType = 'ifood'),
+                        onTap: () => setState(() {
+                          _sellerType = 'ifood';
+                          _customSellPrice = 0.0;
+                        }),
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -423,7 +433,10 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: InkWell(
-                        onTap: () => setState(() => _sellerType = 'other'),
+                        onTap: () => setState(() {
+                          _sellerType = 'other';
+                          _customSellPrice = 0.0;
+                        }),
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -494,7 +507,52 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
+                        // Aviso de Preço iFood vs Balcão
+                        if (_selectedProduct != null && _selectedProduct!.ifoodPrice > 0)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle_outline, color: Colors.green, size: 15),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Preço iFood aplicado: R\$ ${_productPrice.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (_selectedProduct != null && _selectedProduct!.ifoodPrice <= 0)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline, color: Colors.brown, size: 15),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Sem preço iFood específico no Catálogo. Usando preço de balcão (R\$ ${_productPrice.toStringAsFixed(2)}). Você pode cadastrar na aba Catálogo.',
+                                    style: const TextStyle(fontSize: 11, color: Colors.brown, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         const Text('Plano iFood:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 6),
                         Wrap(

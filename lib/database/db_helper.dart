@@ -437,7 +437,7 @@ class DatabaseHelper {
   Future<List<Product>> _fetchProductsSummary() async {
     final response = await _client
         .from('products')
-        .select('id, name, suggestedPrice, sellPrice, profitMarginPercent, isFeatured, category, unit, yieldAmount')
+        .select('id, name, suggestedPrice, sellPrice, ifoodPrice, profitMarginPercent, isFeatured, category, unit, yieldAmount')
         .order('name', ascending: true);
     return (response as List).map<Product>((json) => Product.fromMap(json)).toList();
   }
@@ -542,6 +542,11 @@ class DatabaseHelper {
     }
     clearProductsCache();
     return 1;
+  }
+
+  Future<void> updateProductIfoodPrice(int id, double ifoodPrice) async {
+    await _client.from('products').update({'ifoodPrice': ifoodPrice}).eq('id', id);
+    clearProductsCache();
   }
 
   // --- SETTINGS ---
