@@ -19,12 +19,19 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = DatabaseHelper.instance.cachedIngredients;
+    if (cached != null && cached.isNotEmpty) {
+      _allIngredients = cached;
+      _isLoading = false;
+    }
     _refreshIngredients();
   }
 
   Future<void> _refreshIngredients() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_allIngredients.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       _allIngredients = await DatabaseHelper.instance.readAllIngredients();
     } catch (e) {

@@ -47,18 +47,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _selectedRecipes.addAll(widget.product!.recipes);
       _expenses.addAll(widget.product!.extraExpenses);
     }
+    if (DatabaseHelper.instance.cachedRecipes != null) {
+      _availableRecipes = DatabaseHelper.instance.cachedRecipes!;
+    }
     _loadInitialData();
   }
 
   Future<void> _loadInitialData() async {
-    final recipes = await DatabaseHelper.instance.readAllRecipes();
-    final products = await DatabaseHelper.instance.readAllProducts();
+    final results = await Future.wait([
+      DatabaseHelper.instance.readAllRecipes(),
+      DatabaseHelper.instance.getCategories(),
+    ]);
     
-    setState(() {
-      _availableRecipes = recipes;
-      _existingCategories = products.map((p) => p.category).toSet().toList();
-      if (_existingCategories.isEmpty) _existingCategories = ['Geral'];
-    });
+    if (mounted) {
+      setState(() {
+        _availableRecipes = results[0] as List<Recipe>;
+        _existingCategories = results[1] as List<String>;
+      });
+    }
   }
 
   Future<void> _pickImage() async {

@@ -22,22 +22,32 @@ class _RefrigeratorStockScreenState extends State<RefrigeratorStockScreen> {
 
   @override
   void initState() {
-    super.initState();
+    final cached = DatabaseHelper.instance.cachedStock;
+    if (cached != null && cached.isNotEmpty) {
+      _stockItems = cached;
+      _isLoading = false;
+    }
     _loadData();
   }
 
   Future<void> _loadData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_stockItems.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final results = await Future.wait([
         DatabaseHelper.instance.readRefrigeratorStock(),
-        DatabaseHelper.instance.readAllProducts(),
+        DatabaseHelper.instance.readProductsSummary(),
         DatabaseHelper.instance.readAllRecipes(),
       ]);
-      _stockItems = results[0] as List<RefrigeratorItem>;
-      _products = results[1] as List<Product>;
-      _recipes = results[2] as List<Recipe>;
+      if (mounted) {
+        setState(() {
+          _stockItems = results[0] as List<RefrigeratorItem>;
+          _products = results[1] as List<Product>;
+          _recipes = results[2] as List<Recipe>;
+        });
+      }
     } catch (e) {
       debugPrint('Erro ao carregar geladeira: $e');
     } finally {

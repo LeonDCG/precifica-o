@@ -25,7 +25,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
   double _desiredSalary = 2000.0;
   double _workedHoursPerMonth = 160.0;
-  List<Product> _products = [];
+  int _productCount = 0;
   double _monthlyTarget = 0.0;
   double _monthlyNetProfit = 0.0;
 
@@ -34,22 +34,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // Renderização instantânea se houver dados no cache
+    final cachedSales = DatabaseHelper.instance.cachedSales;
+    if (cachedSales != null) {
+      _isLoading = false;
+      _calculateProfit(cachedSales);
+    }
     _loadData();
+  }
+
+  void _calculateProfit(List<Sale> sales) {
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    double monthlyProfitSum = 0.0;
+    for (var s in sales) {
+      final sDate = DateTime(s.saleDate.year, s.saleDate.month, s.saleDate.day);
+      if (sDate.compareTo(monthStart) >= 0) {
+        monthlyProfitSum += s.netProfit;
+      }
+    }
+    _monthlyNetProfit = monthlyProfitSum;
   }
 
   Future<void> _loadData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (DatabaseHelper.instance.cachedSales == null) {
+      setState(() => _isLoading = true);
+    }
     
     try {
       final results = await Future.wait([
         DatabaseHelper.instance.getAllSettings(),
-        DatabaseHelper.instance.readAllProducts(),
+        DatabaseHelper.instance.getProductCount(),
         DatabaseHelper.instance.readAllSales(),
       ]);
 
       final settings = results[0] as Map<String, String>;
-      final prods = results[1] as List<Product>;
+      final count = results[1] as int;
       final sales = results[2] as List<Sale>;
 
       final salaryStr = settings['desiredSalary'];
@@ -60,20 +81,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (hoursStr != null) _workedHoursPerMonth = double.tryParse(hoursStr) ?? 160.0;
       if (targetStr != null) _monthlyTarget = double.tryParse(targetStr) ?? 0.0;
       
-      _products = prods;
-
-      // Calcular Lucro Mensal Real
-      final now = DateTime.now();
-      final monthStart = DateTime(now.year, now.month, 1);
-      
-      double monthlyProfitSum = 0.0;
-      for (var s in sales) {
-        final sDate = DateTime(s.saleDate.year, s.saleDate.month, s.saleDate.day);
-        if (sDate.compareTo(monthStart) >= 0) {
-          monthlyProfitSum += s.netProfit;
-        }
-      }
-      _monthlyNetProfit = monthlyProfitSum;
+      _productCount = count;
+      _calculateProfit(sales);
     } catch (e, stack) {
       debugPrint('Erro ao carregar dados do Dashboard: $e\n$stack');
     } finally {
@@ -521,7 +530,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             children: [
                               const Icon(Icons.cake, color: Colors.brown, size: 32),
                               const SizedBox(height: 8),
-                              Text('${_products.length}', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 24)),
+                              Text('$_productCount', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 24)),
                               const Text('Produtos', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
                             ],
                           ),

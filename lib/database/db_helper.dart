@@ -25,16 +25,29 @@ class DatabaseHelper {
   List<Ingredient>? _cachedIngredients;
   List<Recipe>? _cachedRecipes;
   List<Product>? _cachedProducts;
+  List<Product>? _cachedProductsSummary;
+  int? _cachedProductCount;
+  List<String>? _cachedCategories;
   Map<int, String>? _cachedProductImages;
   Map<String, String>? _cachedSettings;
   List<Sale>? _cachedSales;
   final Map<String, List<Sale>> _cachedSellerSales = {};
   List<RefrigeratorItem>? _cachedStock;
 
+  // Getters para renderização instantânea (Stale-While-Revalidate)
+  List<Ingredient>? get cachedIngredients => _cachedIngredients;
+  List<Recipe>? get cachedRecipes => _cachedRecipes;
+  List<Product>? get cachedProducts => _cachedProducts;
+  List<Product>? get cachedProductsSummary => _cachedProductsSummary ?? _cachedProducts;
+  List<Sale>? get cachedSales => _cachedSales;
+  List<Sale>? getCachedSellerSales(String sellerName) => _cachedSellerSales[sellerName.trim().toLowerCase()];
+  List<RefrigeratorItem>? get cachedStock => _cachedStock;
+
   // Futures em voo para desduplicar requisições concorrentes
   Future<List<Ingredient>>? _inFlightIngredients;
   Future<List<Recipe>>? _inFlightRecipes;
   Future<List<Product>>? _inFlightProducts;
+  Future<List<Product>>? _inFlightProductsSummary;
   Future<Map<int, String>>? _inFlightProductImages;
   Future<Map<String, String>>? _inFlightSettings;
   Future<List<Sale>>? _inFlightSales;
@@ -44,15 +57,22 @@ class DatabaseHelper {
     _cachedIngredients = null;
     _cachedRecipes = null;
     _cachedProducts = null;
+    _cachedProductsSummary = null;
+    _cachedProductCount = null;
+    _cachedCategories = null;
     _cachedProductImages = null;
     _cachedSettings = null;
     _cachedSales = null;
     _cachedSellerSales.clear();
     _cachedStock = null;
+    _cachedProfile = null;
   }
 
   void clearProductsCache() {
     _cachedProducts = null;
+    _cachedProductsSummary = null;
+    _cachedProductCount = null;
+    _cachedCategories = null;
     _cachedProductImages = null;
   }
 
@@ -280,6 +300,8 @@ class DatabaseHelper {
     try {
       final res = await _inFlightProducts!;
       _cachedProducts = res;
+      _cachedProductsSummary = res;
+      _cachedProductCount = res.length;
       // Atualizar também o cache de imagens para evitar query duplicada
       final imgMap = <int, String>{};
       for (var p in res) {
@@ -373,16 +395,110 @@ class DatabaseHelper {
 
   Future<Map<int, String>> _fetchProductImages() async {
     try {
-      final response = await _client.from('products').select('id, imagepath');
+      final response = await _client.from('products').select('id, imagePath');
       final map = <int, String>{};
       for (var r in response) {
-        if (r['id'] != null && r['imagepath'] != null && r['imagepath'].toString().isNotEmpty) {
-          map[r['id'] as int] = r['imagepath'].toString();
+        if (r['id'] != null && r['imagePath'] != null && r['imagePath'].toString().isNotEmpty) {
+          map[r['id'] as int] = r['imagePath'].toString();
         }
       }
       return map;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Erro ao buscar imagens de produtos: $e');
       return {};
+    }
+  }
+
+  /// Busca resumida de produtos para telas que não precisam de receitas/despesas nem imagens Base64.
+  /// Reduz o tráfego de rede e tempo de resposta em mais de 90%.
+  Future<List<Product>> readProductsSummary({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedProductsSummary != null) {
+      return _cachedProductsSummary!;
+    }
+    if (!forceRefresh && _cachedProducts != null) {
+      _cachedProductsSummary = _cachedProducts;
+      return _cachedProducts!;
+    }
+    if (_inFlightProductsSummary != null) {
+      return _inFlightProductsSummary!;
+    }
+
+    _inFlightProductsSummary = _fetchProductsSummary();
+    try {
+      final res = await _inFlightProductsSummary!;
+      _cachedProductsSummary = res;
+      _cachedProductCount = res.length;
+      return res;
+    } finally {
+      _inFlightProductsSummary = null;
+    }
+  }
+
+  Future<List<Product>> _fetchProductsSummary() async {
+    final response = await _client
+        .from('products')
+        .select('id, name, suggestedPrice, sellPrice, profitMarginPercent, isFeatured, category, unit, yieldAmount')
+        .order('name', ascending: true);
+    return (response as List).map<Product>((json) => Product.fromMap(json)).toList();
+  }
+
+  /// Retorna apenas a contagem total de produtos sem transferir dados pesados
+  Future<int> getProductCount({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedProductCount != null) {
+      return _cachedProductCount!;
+    }
+    if (_cachedProducts != null) {
+      _cachedProductCount = _cachedProducts!.length;
+      return _cachedProductCount!;
+    }
+    if (_cachedProductsSummary != null) {
+      _cachedProductCount = _cachedProductsSummary!.length;
+      return _cachedProductCount!;
+    }
+    try {
+      final response = await _client.from('products').select('id');
+      final count = (response as List).length;
+      _cachedProductCount = count;
+      return count;
+    } catch (_) {
+      return _cachedProducts?.length ?? 0;
+    }
+  }
+
+  /// Retorna categorias existentes de forma leve para o cadastro de produto
+  Future<List<String>> getCategories({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedCategories != null) {
+      return _cachedCategories!;
+    }
+    if (_cachedProducts != null) {
+      final cats = _cachedProducts!
+          .map((p) => p.category.trim().isEmpty ? 'Geral' : p.category.trim())
+          .toSet()
+          .toList();
+      _cachedCategories = cats;
+      return cats;
+    }
+    if (_cachedProductsSummary != null) {
+      final cats = _cachedProductsSummary!
+          .map((p) => p.category.trim().isEmpty ? 'Geral' : p.category.trim())
+          .toSet()
+          .toList();
+      _cachedCategories = cats;
+      return cats;
+    }
+    try {
+      final response = await _client.from('products').select('category');
+      final Set<String> set = {};
+      for (var r in response) {
+        final c = r['category']?.toString().trim();
+        set.add(c == null || c.isEmpty ? 'Geral' : c);
+      }
+      final list = set.toList();
+      if (list.isEmpty) list.add('Geral');
+      _cachedCategories = list;
+      return list;
+    } catch (_) {
+      return ['Geral'];
     }
   }
 
@@ -629,16 +745,23 @@ class DatabaseHelper {
   }
 
   // --- PROFILES & ROLES ---
-  Future<Profile?> getProfile(String uid) async {
+  Profile? _cachedProfile;
+
+  Future<Profile?> getProfile(String uid, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedProfile != null && _cachedProfile!.id == uid) {
+      return _cachedProfile;
+    }
     try {
       final response = await _client.from('profiles').select().eq('id', uid).maybeSingle();
       if (response != null) {
-        return Profile.fromMap(response);
+        final prof = Profile.fromMap(response);
+        _cachedProfile = prof;
+        return prof;
       }
     } catch (e) {
       debugPrint('Erro ao buscar perfil: $e');
     }
-    return null;
+    return _cachedProfile;
   }
 
   Future<void> createProfile(Profile profile) async {

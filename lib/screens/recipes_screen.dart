@@ -19,12 +19,19 @@ class _RecipesScreenState extends State<RecipesScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = DatabaseHelper.instance.cachedRecipes;
+    if (cached != null && cached.isNotEmpty) {
+      _recipes = cached;
+      _isLoading = false;
+    }
     _refreshRecipes();
   }
 
   Future<void> _refreshRecipes() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_recipes.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       _recipes = await DatabaseHelper.instance.readAllRecipes();
     } catch (e) {

@@ -35,26 +35,33 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = DatabaseHelper.instance.cachedProductsSummary;
+    if (cached != null && cached.isNotEmpty) {
+      _products = cached;
+      _isLoading = false;
+    }
     _loadProducts();
   }
 
   Future<void> _loadProducts() async {
-    final prods = await DatabaseHelper.instance.readAllProducts();
+    final prods = await DatabaseHelper.instance.readProductsSummary();
     final user = Supabase.instance.client.auth.currentUser;
     Profile? profile;
     if (user != null) {
       profile = await DatabaseHelper.instance.getProfile(user.id);
     }
-    setState(() {
-      _products = prods;
-      _profile = profile;
-      if (_profile != null && _profile!.role == 'seller') {
-        _sellerType = 'other';
-        _sellerName = _profile!.name;
-        _commissionPercent = _profile!.commissionPercent;
-      }
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _products = prods;
+        _profile = profile;
+        if (_profile != null && _profile!.role == 'seller') {
+          _sellerType = 'other';
+          _sellerName = _profile!.name;
+          _commissionPercent = _profile!.commissionPercent;
+        }
+        _isLoading = false;
+      });
+    }
   }
 
   double get _productCost {

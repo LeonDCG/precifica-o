@@ -26,16 +26,30 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = DatabaseHelper.instance.cachedProductsSummary;
+    if (cached != null && cached.isNotEmpty) {
+      _products = cached;
+    }
     _loadData();
   }
 
   Future<void> _loadData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_requests.isEmpty) {
+      setState(() => _isLoading = true);
+    }
 
     try {
-      _requests = await DatabaseHelper.instance.getSellerOrderRequests(widget.profile.id);
-      _products = await DatabaseHelper.instance.readAllProducts();
+      final results = await Future.wait([
+        DatabaseHelper.instance.getSellerOrderRequests(widget.profile.id),
+        DatabaseHelper.instance.readProductsSummary(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _requests = results[0] as List<OrderRequest>;
+          _products = results[1] as List<Product>;
+        });
+      }
     } catch (e) {
       debugPrint('Erro ao carregar encomendas: $e');
     } finally {

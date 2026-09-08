@@ -25,12 +25,24 @@ class _SellerDashboardState extends State<SellerDashboard> {
   @override
   void initState() {
     super.initState();
+    final cachedSales = DatabaseHelper.instance.getCachedSellerSales(widget.profile.name);
+    if (cachedSales != null && cachedSales.isNotEmpty) {
+      _sellerSales = cachedSales;
+      double commissionSum = 0.0;
+      for (var s in cachedSales) {
+        commissionSum += s.commissionValue;
+      }
+      _monthlyCommission = commissionSum;
+      _isLoading = false;
+    }
     _loadData();
   }
 
   Future<void> _loadData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_sellerSales.isEmpty && _consignedStock.isEmpty) {
+      setState(() => _isLoading = true);
+    }
 
     try {
       final results = await Future.wait([

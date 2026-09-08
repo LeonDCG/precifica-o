@@ -37,6 +37,10 @@ class Product {
     for (var e in extraExpenses) {
       sum += e.cost;
     }
+    // Se receitas não estiverem carregadas (consulta leve), deduz do suggestedPrice salvo
+    if (sum == 0 && suggestedPrice > 0 && profitMarginPercent > -100) {
+      return suggestedPrice / (1 + (profitMarginPercent / 100));
+    }
     return sum;
   }
 

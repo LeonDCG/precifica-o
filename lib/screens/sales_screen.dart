@@ -24,6 +24,13 @@ class _SalesScreenState extends State<SalesScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = widget.profile != null && widget.profile!.role == 'seller'
+        ? DatabaseHelper.instance.getCachedSellerSales(widget.profile!.name)
+        : DatabaseHelper.instance.cachedSales;
+    if (cached != null && cached.isNotEmpty) {
+      _sales = cached;
+      _isLoading = false;
+    }
     _refreshSales();
     _loadTarget();
   }
@@ -75,7 +82,9 @@ class _SalesScreenState extends State<SalesScreen> {
 
   Future<void> _refreshSales() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_sales.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final Future<List<Sale>> salesFuture;
       if (widget.profile != null && widget.profile!.role == 'seller') {

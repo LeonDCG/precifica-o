@@ -22,24 +22,36 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = DatabaseHelper.instance.cachedProducts;
+    if (cached != null && cached.isNotEmpty) {
+      _products = cached;
+      _groupAndSetProducts(cached);
+      _isLoading = false;
+    }
     _refreshProducts();
   }
 
-  Future<void> _refreshProducts() async {
+  void _groupAndSetProducts(List<Product> prods) {
+    final Map<String, List<Product>> grouped = {};
+    for (var product in prods) {
+      final cat = product.category.trim().isEmpty ? 'Geral' : product.category.trim();
+      grouped.putIfAbsent(cat, () => []).add(product);
+    }
+    _groupedProducts = grouped;
+    _categories = grouped.keys.toList();
+  }
+
+  Future<void> _refreshProducts({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_products.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
-      final prods = await DatabaseHelper.instance.readAllProducts();
-      final Map<String, List<Product>> grouped = {};
-      for (var product in prods) {
-        final cat = product.category.trim().isEmpty ? 'Geral' : product.category.trim();
-        grouped.putIfAbsent(cat, () => []).add(product);
-      }
+      final prods = await DatabaseHelper.instance.readAllProducts(forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
           _products = prods;
-          _groupedProducts = grouped;
-          _categories = grouped.keys.toList();
+          _groupAndSetProducts(prods);
         });
       }
     } catch (e) {
