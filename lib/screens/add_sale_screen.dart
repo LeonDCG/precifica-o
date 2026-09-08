@@ -24,10 +24,16 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
   DateTime _saleDate = DateTime.now();
   String _notes = '';
   
-  String _sellerType = 'me'; // 'me' ou 'other'
+  String _sellerType = 'me'; // 'me', 'ifood' ou 'other'
   String _sellerName = '';
   double _commissionPercent = 30.0;
   String _saleUnitType = 'unit'; // 'unit' ou 'whole'
+
+  // iFood settings:
+  String _ifoodPlan = 'delivery'; // 'delivery' (Plano Entrega 27%), 'basic' (Plano Básico 15.2%), 'custom'
+  double _ifoodRate = 27.0; // 27.0% default for Plano Entrega as user specified
+  String _ifoodOrderCode = '';
+  double _ifoodDiscount = 0.0;
   
   bool _isLoading = true;
   Profile? _profile;
@@ -93,7 +99,11 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
 
   double get _commissionValue {
     if (_sellerType == 'me') return 0.0;
-    // Comissão calculada sobre o LUCRO BRUTO da venda
+    if (_sellerType == 'ifood') {
+      // Retenção do iFood: taxa sobre valor bruto dos itens + cupom da loja
+      return (_totalSaleValue * (_ifoodRate / 100)) + _ifoodDiscount;
+    }
+    // Comissão de vendedor parceiro sobre o lucro bruto da venda
     if (_totalSaleProfit <= 0) return 0.0;
     return _totalSaleProfit * (_commissionPercent / 100);
   }
@@ -121,6 +131,28 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       final suffix = _selectedProduct!.yieldAmount > 1 
           ? (_saleUnitType == 'unit' ? ' (${_selectedProduct!.unit})' : ' (Inteiro)')
           : '';
+
+      String effectiveSellerName;
+      double effectiveCommissionPercent;
+      String effectiveNotes = _notes;
+
+      if (_sellerType == 'me') {
+        effectiveSellerName = 'Você';
+        effectiveCommissionPercent = 0.0;
+      } else if (_sellerType == 'ifood') {
+        effectiveSellerName = _ifoodPlan == 'basic'
+            ? 'iFood (Básico)'
+            : (_ifoodPlan == 'custom' ? 'iFood' : 'iFood (Plano Entrega)');
+        effectiveCommissionPercent = _ifoodRate;
+        if (_ifoodOrderCode.trim().isNotEmpty) {
+          final prefix = '[Pedido iFood #${_ifoodOrderCode.trim().replaceAll('#', '')}]';
+          effectiveNotes = effectiveNotes.isEmpty ? prefix : '$prefix $effectiveNotes';
+        }
+      } else {
+        effectiveSellerName = _sellerName;
+        effectiveCommissionPercent = _commissionPercent;
+      }
+
       final sale = Sale(
         productId: _selectedProduct!.id,
         productName: _selectedProduct!.name + suffix,
@@ -129,12 +161,12 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
         totalCost: _totalSaleCost,
         totalProfit: _totalSaleProfit,
         sellerType: _sellerType,
-        sellerName: _sellerType == 'me' ? 'Você' : _sellerName,
-        commissionPercent: _sellerType == 'me' ? 0.0 : _commissionPercent,
+        sellerName: effectiveSellerName,
+        commissionPercent: effectiveCommissionPercent,
         commissionValue: _commissionValue,
         netProfit: _netProfit,
         saleDate: _saleDate,
-        notes: _notes,
+        notes: effectiveNotes,
       );
       
       await DatabaseHelper.instance.createSale(sale);
@@ -313,29 +345,306 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
               const SizedBox(height: 24),
               
               if (_profile?.role != 'seller') ...[
-                Text('Quem realizou a venda?', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
+                Text('Canal / Modalidade de Venda:', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
                 Row(
                   children: [
-                    ChoiceChip(
-                      label: const Text('Eu Mesmo'),
-                      selected: _sellerType == 'me',
-                      onSelected: (selected) {
-                        if (selected) setState(() => _sellerType = 'me');
-                      },
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _sellerType = 'me'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: _sellerType == 'me'
+                                ? Colors.teal.withValues(alpha: 0.15)
+                                : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _sellerType == 'me' ? Colors.teal : Colors.grey.withValues(alpha: 0.3),
+                              width: _sellerType == 'me' ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.storefront, color: _sellerType == 'me' ? Colors.teal : Colors.grey, size: 22),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Venda Direta',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: _sellerType == 'me' ? FontWeight.bold : FontWeight.normal,
+                                  color: _sellerType == 'me' ? Colors.teal : null,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    ChoiceChip(
-                      label: const Text('Outra Pessoa'),
-                      selected: _sellerType == 'other',
-                      onSelected: (selected) {
-                        if (selected) setState(() => _sellerType = 'other');
-                      },
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _sellerType = 'ifood'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: _sellerType == 'ifood'
+                                ? const Color(0xFFEA1D2C).withValues(alpha: 0.15)
+                                : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _sellerType == 'ifood' ? const Color(0xFFEA1D2C) : Colors.grey.withValues(alpha: 0.3),
+                              width: _sellerType == 'ifood' ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.delivery_dining, color: _sellerType == 'ifood' ? const Color(0xFFEA1D2C) : Colors.grey, size: 22),
+                              const SizedBox(height: 4),
+                              Text(
+                                'iFood',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: _sellerType == 'ifood' ? FontWeight.bold : FontWeight.normal,
+                                  color: _sellerType == 'ifood' ? const Color(0xFFEA1D2C) : null,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _sellerType = 'other'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: _sellerType == 'other'
+                                ? const Color(0xFFD4AF37).withValues(alpha: 0.15)
+                                : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _sellerType == 'other' ? const Color(0xFFD4AF37) : Colors.grey.withValues(alpha: 0.3),
+                              width: _sellerType == 'other' ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.handshake_outlined, color: _sellerType == 'other' ? const Color(0xFFB8860B) : Colors.grey, size: 22),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Vendedor',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: _sellerType == 'other' ? FontWeight.bold : FontWeight.normal,
+                                  color: _sellerType == 'other' ? const Color(0xFFB8860B) : null,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 
+                // Configurações do iFood
+                if (_sellerType == 'ifood') ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEA1D2C).withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFEA1D2C).withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEA1D2C),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.delivery_dining, color: Colors.white, size: 16),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'DETALHES DO PEDIDO IFOOD',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFEA1D2C),
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Plano iFood:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            ChoiceChip(
+                              avatar: const Icon(Icons.two_wheeler, size: 16),
+                              label: const Text('Plano Entrega (27%)'),
+                              selected: _ifoodPlan == 'delivery',
+                              selectedColor: const Color(0xFFEA1D2C).withValues(alpha: 0.2),
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _ifoodPlan = 'delivery';
+                                    _ifoodRate = 27.0;
+                                  });
+                                }
+                              },
+                            ),
+                            ChoiceChip(
+                              avatar: const Icon(Icons.store, size: 16),
+                              label: const Text('Plano Básico (15,2%)'),
+                              selected: _ifoodPlan == 'basic',
+                              selectedColor: const Color(0xFFEA1D2C).withValues(alpha: 0.2),
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _ifoodPlan = 'basic';
+                                    _ifoodRate = 15.2;
+                                  });
+                                }
+                              },
+                            ),
+                            ChoiceChip(
+                              avatar: const Icon(Icons.tune, size: 16),
+                              label: const Text('Personalizado'),
+                              selected: _ifoodPlan == 'custom',
+                              selectedColor: const Color(0xFFEA1D2C).withValues(alpha: 0.2),
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _ifoodPlan = 'custom';
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        if (_ifoodPlan == 'custom') ...[
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            initialValue: _ifoodRate.toString(),
+                            decoration: const InputDecoration(
+                              labelText: 'Taxa Total iFood (%)',
+                              border: OutlineInputBorder(),
+                              suffixText: '%',
+                              isDense: true,
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (v) {
+                              setState(() {
+                                _ifoodRate = double.tryParse(v.replaceAll(',', '.')) ?? 27.0;
+                              });
+                            },
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextFormField(
+                                decoration: const InputDecoration(
+                                  labelText: 'Nº do Pedido iFood',
+                                  hintText: 'Ex: 4821',
+                                  prefixText: '# ',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                onChanged: (v) => _ifoodOrderCode = v,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: TextFormField(
+                                decoration: const InputDecoration(
+                                  labelText: 'Cupom Loja (R\$)',
+                                  hintText: '0,00',
+                                  prefixText: 'R\$ ',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                keyboardType: TextInputType.number,
+                                onChanged: (v) {
+                                  setState(() {
+                                    _ifoodDiscount = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardTheme.color ?? Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Taxa Plataforma (${_ifoodRate.toStringAsFixed(1)}%):',
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                  Text(
+                                    '- R\$ ${_commissionValue.toStringAsFixed(2)}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFEA1D2C)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Repasse Líquido Estimado:',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    'R\$ ${(_totalSaleValue - _commissionValue).toStringAsFixed(2)}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 if (_sellerType == 'other') ...[
                   TextFormField(
                     decoration: const InputDecoration(
@@ -380,7 +689,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Valor Total Recebido:'),
+                        Text(_sellerType == 'ifood' ? 'Valor Total no Cardápio iFood:' : 'Valor Total Recebido:'),
                         Text('R\$ ${_totalSaleValue.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
@@ -398,28 +707,54 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Custo Total Proporcional:'),
+                          const Text('Custo Total Proporcional (CMV):'),
                           Text('R\$ ${_totalSaleCost.toStringAsFixed(2)}', style: const TextStyle(color: Colors.red)),
                         ],
                       ),
                       const Divider(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Lucro Bruto:'),
-                          Text('R\$ ${_totalSaleProfit.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: _totalSaleProfit >= 0 ? Colors.green : Colors.red)),
-                        ],
-                      ),
-                      if (_sellerType == 'other' && _totalSaleProfit > 0) ...[
+                      if (_sellerType == 'ifood') ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Taxa do iFood (${_ifoodRate.toStringAsFixed(1)}%):'),
+                            Text('- R\$ ${_commissionValue.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFFEA1D2C), fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                         const SizedBox(height: 6),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Comissão do Vendedor ($_commissionPercent%):'),
-                            Text('- R\$ ${_commissionValue.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                            const Text('Repasse Líquido Estimado:'),
+                            Text('R\$ ${(_totalSaleValue - _commissionValue).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                           ],
                         ),
                         const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Seu Lucro Líquido Real:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            Text('R\$ ${_netProfit.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 16)),
+                          ],
+                        ),
+                      ] else ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Lucro Bruto:'),
+                            Text('R\$ ${_totalSaleProfit.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, color: _totalSaleProfit >= 0 ? Colors.green : Colors.red)),
+                          ],
+                        ),
+                        if (_sellerType == 'other' && _totalSaleProfit > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Comissão do Vendedor ($_commissionPercent%):'),
+                              Text('- R\$ ${_commissionValue.toStringAsFixed(2)}', style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                        ],
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [

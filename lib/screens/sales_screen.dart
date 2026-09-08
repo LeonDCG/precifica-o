@@ -18,6 +18,7 @@ class _SalesScreenState extends State<SalesScreen> {
   List<Sale> _sales = [];
   bool _isLoading = true;
   String _selectedPeriod = 'month'; // 'day', 'week', 'month', 'all'
+  String _selectedChannel = 'all'; // 'all', 'direct', 'ifood', 'seller'
   double _monthlyTarget = 0.0;
   Map<int, String> _productImages = {};
 
@@ -134,13 +135,25 @@ class _SalesScreenState extends State<SalesScreen> {
 
     return _sales.where((s) {
       final sDate = DateTime(s.saleDate.year, s.saleDate.month, s.saleDate.day);
+      bool matchesPeriod = true;
       if (_selectedPeriod == 'day') {
-        return sDate.isAtSameMomentAs(todayStart);
+        matchesPeriod = sDate.isAtSameMomentAs(todayStart);
       } else if (_selectedPeriod == 'week') {
-        return sDate.compareTo(weekStart) >= 0;
+        matchesPeriod = sDate.compareTo(weekStart) >= 0;
       } else if (_selectedPeriod == 'month') {
-        return sDate.compareTo(monthStart) >= 0;
+        matchesPeriod = sDate.compareTo(monthStart) >= 0;
       }
+
+      if (!matchesPeriod) return false;
+
+      if (_selectedChannel == 'direct') {
+        return s.isDirect;
+      } else if (_selectedChannel == 'ifood') {
+        return s.isIfood;
+      } else if (_selectedChannel == 'seller') {
+        return s.isSeller;
+      }
+
       return true; // 'all'
     }).toList();
   }
@@ -223,6 +236,23 @@ class _SalesScreenState extends State<SalesScreen> {
                             _buildPeriodChip('Tudo', 'all'),
                           ],
                         ),
+                        if (widget.profile?.role != 'seller') ...[
+                          const SizedBox(height: 8),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _buildChannelChip('Todos', 'all', null),
+                                const SizedBox(width: 8),
+                                _buildChannelChip('Venda Direta', 'direct', Icons.storefront),
+                                const SizedBox(width: 8),
+                                _buildChannelChip('iFood', 'ifood', Icons.delivery_dining, activeColor: const Color(0xFFEA1D2C)),
+                                const SizedBox(width: 8),
+                                _buildChannelChip('Vendedores', 'seller', Icons.handshake_outlined, activeColor: const Color(0xFFD4AF37)),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 14),
                         Row(
                           children: [
@@ -587,7 +617,41 @@ class _SalesScreenState extends State<SalesScreen> {
                                                 Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    if (isSellerSale)
+                                                    if (sale.isIfood)
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFEA1D2C), // Vermelho clássico iFood
+                                                          borderRadius: BorderRadius.circular(20),
+                                                          boxShadow: [
+                                                            BoxShadow(
+                                                              color: const Color(0xFFEA1D2C).withValues(alpha: 0.35),
+                                                              blurRadius: 4,
+                                                              offset: const Offset(0, 1),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            const Icon(Icons.delivery_dining, color: Colors.white, size: 13),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              sale.notes.contains('[Pedido iFood #')
+                                                                  ? 'IFOOD #${sale.notes.split('[Pedido iFood #')[1].split(']')[0]}'
+                                                                  : (sale.notes.contains('#')
+                                                                      ? 'IFOOD #${RegExp(r'#([A-Za-z0-9]+)').firstMatch(sale.notes)?.group(1) ?? ''}'
+                                                                      : 'IFOOD'),
+                                                              style: const TextStyle(
+                                                                color: Colors.white,
+                                                                fontSize: 9,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      )
+                                                    else if (isSellerSale)
                                                       Container(
                                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                                         decoration: BoxDecoration(
@@ -673,7 +737,9 @@ class _SalesScreenState extends State<SalesScreen> {
                                                    children: [
                                                      if (widget.profile?.role != 'seller') ...[
                                                         Text(
-                                                          'Lucro Conf.: R\$ ${sale.netProfit.toStringAsFixed(2)}',
+                                                          sale.isIfood
+                                                              ? 'Lucro Real: R\$ ${sale.netProfit.toStringAsFixed(2)}'
+                                                              : 'Lucro Conf.: R\$ ${sale.netProfit.toStringAsFixed(2)}',
                                                           style: const TextStyle(
                                                             color: Colors.greenAccent,
                                                             fontWeight: FontWeight.bold,
@@ -683,9 +749,11 @@ class _SalesScreenState extends State<SalesScreen> {
                                                         if (sale.commissionValue > 0) ...[
                                                           const SizedBox(height: 2),
                                                           Text(
-                                                            'Comissão (${sale.commissionPercent.toStringAsFixed(0)}% lucro): R\$ ${sale.commissionValue.toStringAsFixed(2)}',
-                                                            style: const TextStyle(
-                                                              color: Colors.orangeAccent,
+                                                            sale.isIfood
+                                                                ? 'Taxa iFood (${sale.commissionPercent.toStringAsFixed(0)}%): - R\$ ${sale.commissionValue.toStringAsFixed(2)}'
+                                                                : 'Comissão (${sale.commissionPercent.toStringAsFixed(0)}% lucro): R\$ ${sale.commissionValue.toStringAsFixed(2)}',
+                                                            style: TextStyle(
+                                                              color: sale.isIfood ? const Color(0xFFFF8A80) : Colors.orangeAccent,
                                                               fontSize: 10,
                                                               fontWeight: FontWeight.w600,
                                                             ),
@@ -741,6 +809,35 @@ class _SalesScreenState extends State<SalesScreen> {
         if (selected) {
           setState(() {
             _selectedPeriod = period;
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildChannelChip(String label, String channel, IconData? icon, {Color? activeColor}) {
+    final isSelected = _selectedChannel == channel;
+    final color = activeColor ?? Theme.of(context).primaryColor;
+    return ChoiceChip(
+      avatar: icon != null
+          ? Icon(icon, size: 14, color: isSelected ? Colors.white : (activeColor ?? Colors.grey[700]))
+          : null,
+      label: Text(label),
+      selected: isSelected,
+      labelStyle: TextStyle(
+        fontSize: 11,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? Colors.white : Colors.black87,
+      ),
+      selectedColor: color,
+      backgroundColor: Colors.grey[200],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _selectedChannel = channel;
           });
         }
       },

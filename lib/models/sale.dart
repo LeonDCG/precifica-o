@@ -70,4 +70,10 @@ class Sale {
       notes: map['notes'] ?? '',
     );
   }
+
+  bool get isIfood =>
+      sellerType.toLowerCase() == 'ifood' || sellerName.toLowerCase().contains('ifood');
+  bool get isSeller =>
+      (sellerType.toLowerCase() == 'other' || (sellerName.isNotEmpty && sellerName.toLowerCase() != 'você')) && !isIfood;
+  bool get isDirect => !isIfood && !isSeller;
 }
