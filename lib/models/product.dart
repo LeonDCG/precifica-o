@@ -117,10 +117,10 @@ class ProductRecipe {
   factory ProductRecipe.fromMap(Map<String, dynamic> map) {
     return ProductRecipe(
       id: map['id'],
-      productId: map['productid'] ?? map['productId'],
-      recipeId: map['recipeid'] ?? map['recipeId'],
-      quantityUsed: (map['quantityused'] ?? map['quantityUsed'] as num).toDouble(),
-      cost: (map['cost'] as num).toDouble(),
+      productId: ((map['productid'] ?? map['productId']) as num?)?.toInt() ?? 0,
+      recipeId: ((map['recipeid'] ?? map['recipeId']) as num?)?.toInt() ?? 0,
+      quantityUsed: ((map['quantityused'] ?? map['quantityUsed']) as num?)?.toDouble() ?? 1.0,
+      cost: (map['cost'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
@@ -150,9 +150,9 @@ class ProductExpense {
   factory ProductExpense.fromMap(Map<String, dynamic> map) {
     return ProductExpense(
       id: map['id'],
-      productId: map['productid'] ?? map['productId'],
-      name: map['name'],
-      cost: (map['cost'] as num).toDouble(),
+      productId: ((map['productid'] ?? map['productId']) as num?)?.toInt() ?? 0,
+      name: map['name'] ?? '',
+      cost: (map['cost'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

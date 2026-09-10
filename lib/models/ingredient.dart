@@ -37,10 +37,10 @@ class Ingredient {
   factory Ingredient.fromMap(Map<String, dynamic> map) {
     return Ingredient(
       id: map['id'],
-      name: map['name'],
-      unit: map['unit'],
-      price: (map['price'] as num).toDouble(),
-      quantity: (map['quantity'] as num).toDouble(),
+      name: map['name'] ?? '',
+      unit: map['unit'] ?? '',
+      price: (map['price'] as num?)?.toDouble() ?? 0.0,
+      quantity: (map['quantity'] as num?)?.toDouble() ?? 1.0,
       type: map['type'] ?? 'ingredient',
       category: map['category'] ?? '',
     );

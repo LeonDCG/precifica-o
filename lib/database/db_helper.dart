@@ -198,22 +198,23 @@ class DatabaseHelper {
     final allIngredientsRaw = results[1] as List;
     final allRecipeIngredientsRaw = results[2] as List;
 
-    final ingredientsMap = <int, Ingredient>{};
+    final ingredientNameMap = <int, String>{};
+    final ingredientUnitMap = <int, String>{};
     for (var json in allIngredientsRaw) {
-      final ing = Ingredient.fromMap(json);
-      if (ing.id != null) ingredientsMap[ing.id!] = ing;
+      if (json['id'] != null) {
+        final id = json['id'] as int;
+        ingredientNameMap[id] = json['name']?.toString() ?? '';
+        ingredientUnitMap[id] = json['unit']?.toString() ?? '';
+      }
     }
 
     final recipeIngredientsByRecipeId = <int, List<RecipeIngredient>>{};
     for (var json in allRecipeIngredientsRaw) {
       final ri = RecipeIngredient.fromMap(json);
-      if (ri.recipeId != null) {
-        final ing = ingredientsMap[ri.ingredientId];
-        if (ing != null) {
-          ri.ingredientName = ing.name;
-          ri.ingredientUnit = ing.unit;
-        }
-        recipeIngredientsByRecipeId.putIfAbsent(ri.recipeId!, () => []).add(ri);
+      if (ri.recipeId != 0) {
+        ri.ingredientName = ingredientNameMap[ri.ingredientId] ?? '';
+        ri.ingredientUnit = ingredientUnitMap[ri.ingredientId] ?? '';
+        recipeIngredientsByRecipeId.putIfAbsent(ri.recipeId, () => []).add(ri);
       }
     }
 
