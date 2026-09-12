@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../database/db_helper.dart';
 import '../models/sale.dart';
 import 'add_sale_screen.dart';
+import 'import_ifood_screen.dart';
 import '../models/profile.dart';
 import '../widgets/app_cached_image.dart';
 
@@ -206,6 +207,20 @@ class _SalesScreenState extends State<SalesScreen> {
             Text('Vendas', style: GoogleFonts.merriweather(fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
+        actions: [
+          if (widget.profile?.role != 'seller')
+            IconButton(
+              tooltip: 'Relatórios e Importação iFood',
+              icon: const Icon(Icons.delivery_dining, color: Color(0xFFEA1D2C)),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ImportIfoodScreen()),
+                );
+                _refreshSales();
+              },
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -285,6 +300,57 @@ class _SalesScreenState extends State<SalesScreen> {
                             ],
                           ],
                         ),
+                        if (_selectedChannel == 'ifood') ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEA1D2C).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFEA1D2C).withValues(alpha: 0.25)),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: const Color(0xFFEA1D2C).withValues(alpha: 0.15),
+                                  child: const Icon(Icons.delivery_dining, color: Color(0xFFEA1D2C), size: 20),
+                                ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Canal iFood (Taxa Contratual: 26,2%)',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFEA1D2C)),
+                                      ),
+                                      Text(
+                                        'Pico no Jantar (73%) • Preparo em ~12 min • 14 pedidos faturados',
+                                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFFEA1D2C),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  ),
+                                  icon: const Icon(Icons.receipt_long, size: 16),
+                                  label: const Text('Relatórios', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                  onPressed: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const ImportIfoodScreen()),
+                                    );
+                                    _refreshSales();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

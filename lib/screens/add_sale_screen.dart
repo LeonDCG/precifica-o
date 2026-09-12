@@ -29,8 +29,8 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
   String _saleUnitType = 'unit'; // 'unit' ou 'whole'
 
   // iFood settings:
-  String _ifoodPlan = 'delivery'; // 'delivery' (Plano Entrega 27%), 'basic' (Plano Básico 15.2%), 'custom'
-  double _ifoodRate = 27.0; // 27.0% default for Plano Entrega as user specified
+  String _ifoodPlan = 'delivery'; // 'delivery' (Plano Entrega 26.2%), 'basic' (Plano Básico 15.2%), 'custom'
+  double _ifoodRate = 26.2; // 26.2% comprovado no relatório oficial (23% comissão + 3.2% pagamento via app)
   String _ifoodOrderCode = '';
   double _ifoodDiscount = 0.0;
   
@@ -561,14 +561,14 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                           children: [
                             ChoiceChip(
                               avatar: const Icon(Icons.two_wheeler, size: 16),
-                              label: const Text('Plano Entrega (27%)'),
+                              label: const Text('Plano Entrega (26,2%)'),
                               selected: _ifoodPlan == 'delivery',
                               selectedColor: const Color(0xFFEA1D2C).withValues(alpha: 0.2),
                               onSelected: (selected) {
                                 if (selected) {
                                   setState(() {
                                     _ifoodPlan = 'delivery';
-                                    _ifoodRate = 27.0;
+                                    _ifoodRate = 26.2;
                                   });
                                 }
                               },
@@ -615,7 +615,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                             keyboardType: TextInputType.number,
                             onChanged: (v) {
                               setState(() {
-                                _ifoodRate = double.tryParse(v.replaceAll(',', '.')) ?? 27.0;
+                                _ifoodRate = double.tryParse(v.replaceAll(',', '.')) ?? 26.2;
                               });
                             },
                           ),

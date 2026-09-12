@@ -25,16 +25,16 @@ void main() {
 
     test('iFood Plano Entrega sale calculates commission and net profit correctly', () {
       // Pedido no iFood: R$ 60,00
-      // Taxa Plano Entrega: 27% => 60 * 0.27 = R$ 16,20
+      // Taxa Plano Entrega: 26.2% => 60 * 0.262 = R$ 15,72
       // Custo dos insumos: R$ 18,00
-      // Repasse Líquido: 60 - 16.20 = R$ 43,80
-      // Lucro Líquido Real: 43.80 - 18.00 = R$ 25,80
+      // Repasse Líquido: 60 - 15.72 = R$ 44,28
+      // Lucro Líquido Real: 44.28 - 18.00 = R$ 26,28
       const totalValue = 60.0;
       const totalCost = 18.0;
-      const ifoodRate = 27.0;
+      const ifoodRate = 26.2;
       const commissionValue = totalValue * (ifoodRate / 100);
       const totalProfit = totalValue - totalCost; // 42.0
-      const netProfit = totalProfit - commissionValue; // 25.8
+      const netProfit = totalProfit - commissionValue; // 26.28
 
       final ifoodSale = Sale(
         productId: 38,
@@ -55,9 +55,9 @@ void main() {
       expect(ifoodSale.isIfood, isTrue);
       expect(ifoodSale.isDirect, isFalse);
       expect(ifoodSale.isSeller, isFalse);
-      expect(ifoodSale.commissionPercent, equals(27.0));
-      expect(ifoodSale.commissionValue, closeTo(16.20, 0.001));
-      expect(ifoodSale.netProfit, closeTo(25.80, 0.001));
+      expect(ifoodSale.commissionPercent, equals(26.2));
+      expect(ifoodSale.commissionValue, closeTo(15.72, 0.001));
+      expect(ifoodSale.netProfit, closeTo(26.28, 0.001));
       expect(ifoodSale.notes, contains('#4821'));
 
       // Test Serialization / Deserialization toMap and fromMap
@@ -67,8 +67,8 @@ void main() {
       expect(restored.sellerType, equals('ifood'));
       expect(restored.sellerName, equals('iFood (Plano Entrega)'));
       expect(restored.isIfood, isTrue);
-      expect(restored.netProfit, closeTo(25.80, 0.001));
-      expect(restored.commissionPercent, equals(27.0));
+      expect(restored.netProfit, closeTo(26.28, 0.001));
+      expect(restored.commissionPercent, equals(26.2));
     });
 
     test('Partner seller sale is correctly identified as seller', () {

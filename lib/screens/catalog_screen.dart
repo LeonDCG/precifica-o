@@ -453,12 +453,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            // Sugestão com base na taxa padrão de 27% (Plano Entrega iFood)
-            // Preço iFood = Preço Loja / 0.73 para cobrir os 27%
-            final suggestedIfood = basePrice > 0 ? (basePrice / 0.73) : 0.0;
+            // Sugestão com base na taxa real de 26,2% apurada no relatório (23% comissão + 3,2% app)
+            // Preço iFood = Preço Loja / 0.738 para cobrir exatamente os 26,2%
+            final suggestedIfood = basePrice > 0 ? (basePrice / 0.738) : 0.0;
             
-            final retention27 = currentInputPrice * 0.27;
-            final netPayout = currentInputPrice * 0.73;
+            final retention262 = currentInputPrice * 0.262;
+            final netPayout = currentInputPrice * 0.738;
             final netProfit = netPayout - product.totalCost;
             final isProfitPositive = netProfit >= 0;
 
@@ -545,7 +545,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                         icon: const Icon(Icons.auto_awesome, size: 16),
-                        label: Text('Sugerir R\$ ${suggestedIfood.toStringAsFixed(2)} (+27% iFood)'),
+                        label: Text('Sugerir R\$ ${suggestedIfood.toStringAsFixed(2)} (+26,2% iFood)'),
                         onPressed: () {
                           setDialogState(() {
                             currentInputPrice = suggestedIfood;
@@ -590,7 +590,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'SIMULAÇÃO DE REPASSE (PLANO ENTREGA 27%):',
+                              'SIMULAÇÃO DE REPASSE (PLANO ENTREGA 26,2%):',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -602,15 +602,15 @@ class _CatalogScreenState extends State<CatalogScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Comissão iFood (27%):', style: TextStyle(fontSize: 12)),
-                                Text('- R\$ ${retention27.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600)),
+                                const Text('Retenção iFood (26,2%):', style: TextStyle(fontSize: 12)),
+                                Text('- R\$ ${retention262.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600)),
                               ],
                             ),
                             const SizedBox(height: 2),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Repasse Líquido iFood (73%):', style: TextStyle(fontSize: 12)),
+                                const Text('Repasse Líquido iFood (73,8%):', style: TextStyle(fontSize: 12)),
                                 Text('R\$ ${netPayout.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                               ],
                             ),
