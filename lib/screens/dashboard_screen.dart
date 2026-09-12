@@ -12,6 +12,10 @@ import 'add_sale_screen.dart';
 import '../main.dart'; // Para acessar o themeNotifier
 import 'home_screen.dart';
 import 'refrigerator_stock_screen.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'admin_orders_panel_screen.dart';
 import 'admin_sellers_screen.dart';
 
@@ -145,6 +149,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       },
     );
+  }
+
+  Future<void> _handleWebPortalAccess(BuildContext context) async {
+    const portalUrl = 'https://leondcg.github.io/precifica-o/';
+    final isMobileDevice = (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ||
+        (MediaQuery.of(context).size.width < 900);
+
+    if (isMobileDevice) {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.laptop_chromebook, color: Color(0xFF0F4C81)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Acesso Exclusivo Desktop',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'O Portal Web de Gestão e Estoque foi projetado para telas de computador e notebook (tabelas completas, gráficos e relatórios detalhados).\n\nPara acessar, abra o link no navegador do seu computador:',
+                style: TextStyle(fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                ),
+                child: const SelectableText(
+                  portalUrl,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F4C81),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Fechar'),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F4C81),
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Copiar Link'),
+              onPressed: () {
+                Clipboard.setData(const ClipboardData(text: portalUrl));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Link copiado! Cole no navegador do seu computador.'),
+                    backgroundColor: Color(0xFF0F4C81),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+    } else {
+      final uri = Uri.parse(portalUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    }
   }
 
   String _getGreeting() {
@@ -293,6 +384,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: Text('Doce & Ponto', style: GoogleFonts.merriweather(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
+          // Botão minúsculo para Portal Web (Desktop)
+          IconButton(
+            icon: const Icon(Icons.laptop_chromebook, size: 18),
+            padding: const EdgeInsets.all(4),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            tooltip: 'Portal Web Gestão (Desktop)',
+            onPressed: () => _handleWebPortalAccess(context),
+          ),
           // Botão Chaveador Modo Escuro
           IconButton(
             icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: isDark ? Colors.yellow : Colors.black),
