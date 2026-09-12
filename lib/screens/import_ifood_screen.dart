@@ -188,7 +188,7 @@ class _ImportIfoodScreenState extends State<ImportIfoodScreen> with SingleTicker
           notes: '[Pedido iFood #$shortId] $turno',
         );
 
-        await DatabaseHelper.instance.insertSale(newSale);
+        await DatabaseHelper.instance.createSale(newSale);
         importedCount++;
       } catch (e) {
         debugPrint('Erro ao importar pedido ${o['shortId']}: $e');

@@ -618,6 +618,8 @@ class DatabaseHelper {
     return Sale.fromMap(response);
   }
 
+  Future<Sale> insertSale(Sale sale) => createSale(sale);
+
   Future<List<Sale>> readAllSales({bool forceRefresh = false}) async {
     if (!forceRefresh && _cachedSales != null) {
       return _cachedSales!;
