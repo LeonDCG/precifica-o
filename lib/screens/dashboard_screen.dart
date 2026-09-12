@@ -150,7 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _handleWebPortalAccess(BuildContext context) async {
-    const portalUrl = 'http://localhost:8080';
+    const portalUrl = 'https://leondcg.github.io/precifica-o/';
     final isMobileDevice = (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) ||
         (MediaQuery.of(context).size.width < 900);
 
@@ -177,7 +177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'O Portal Web de Gestão e Estoque foi projetado para telas de computador e notebook.\n\nPara iniciar no seu computador, execute o arquivo iniciar_painel_web.bat na pasta do projeto e acesse no navegador:',
+                'O Portal Web de Gestão e Estoque foi projetado para telas de computador e notebook (tabelas completas, gráficos e relatórios detalhados).\n\nPara acessar, abra o link no navegador do seu computador:',
                 style: TextStyle(fontSize: 14, height: 1.4),
               ),
               const SizedBox(height: 14),
@@ -192,7 +192,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: const SelectableText(
                   portalUrl,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F4C81),
                   ),
@@ -211,13 +211,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 foregroundColor: Colors.white,
               ),
               icon: const Icon(Icons.copy, size: 16),
-              label: const Text('Copiar Endereço'),
+              label: const Text('Copiar Link'),
               onPressed: () {
                 Clipboard.setData(const ClipboardData(text: portalUrl));
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Endereço copiado! Abra http://localhost:8080 no computador.'),
+                    content: Text('Link copiado! Cole no navegador do seu computador.'),
                     backgroundColor: Color(0xFF0F4C81),
                   ),
                 );
