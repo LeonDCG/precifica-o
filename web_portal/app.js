@@ -414,8 +414,14 @@ function renderRecipesTable(list) {
         <td>${yieldAmount} ${escapeHtml(rec.yieldunit || 'un')}</td>
         <td>${formatBRL(labor)}</td>
         <td class="text-green font-bold">${formatBRL(yieldAmount > 0 ? labor / yieldAmount : 0)} / un</td>
-        <td class="text-right">
-          <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${rec.id})">+ Produzir</button>
+        <td class="text-right" style="white-space: nowrap;">
+          <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${rec.id})" title="Registrar produção desta receita">+ Produzir</button>
+          <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${rec.id})">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon delete" title="Excluir Receita" onclick="deleteRecipe(${rec.id}, '${escapeHtml(rec.name)}')">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          </button>
         </td>
       </tr>
     `;
@@ -429,14 +435,53 @@ function filterRecipes() {
 }
 
 function openRecipeModal() {
+  document.getElementById('recipeModalTitle').textContent = 'Cadastrar Ficha Técnica / Receita';
   document.getElementById('recipeId').value = '';
   document.getElementById('recipeName').value = '';
   document.getElementById('recipeYieldAmount').value = '1';
   document.getElementById('recipeIngredientsList').innerHTML = '';
-  currentRecipeItems = [];
   addRecipeIngredientRow();
   calcRecipeTotalCost();
   openModal('recipeModal');
+}
+
+async function openEditRecipeModal(recipeId) {
+  const rec = recipesList.find(r => r.id === recipeId);
+  if (!rec) return;
+
+  document.getElementById('recipeModalTitle').textContent = 'Editar Ficha Técnica / Receita';
+  document.getElementById('recipeId').value = rec.id;
+  document.getElementById('recipeName').value = rec.name;
+  document.getElementById('recipeYieldAmount').value = rec.yieldamount || 1;
+  document.getElementById('recipeIngredientsList').innerHTML = '<div class="text-center py-4 text-muted">Carregando ingredientes da receita...</div>';
+
+  openModal('recipeModal');
+
+  try {
+    const { data: items, error } = await supabaseClient
+      .from('recipe_ingredients')
+      .select('*')
+      .eq('recipeid', recipeId);
+
+    if (error) throw error;
+
+    document.getElementById('recipeIngredientsList').innerHTML = '';
+
+    if (items && items.length > 0) {
+      items.forEach(item => {
+        addRecipeIngredientRow(item.ingredientid, item.quantityused);
+      });
+    } else {
+      addRecipeIngredientRow();
+    }
+    calcRecipeTotalCost();
+  } catch (err) {
+    console.error('Erro ao carregar ingredientes da receita:', err);
+    document.getElementById('recipeIngredientsList').innerHTML = '';
+    addRecipeIngredientRow();
+    calcRecipeTotalCost();
+    showToast('Erro ao carregar lista de ingredientes da receita.', 'error');
+  }
 }
 
 function addRecipeIngredientRow(ingId = '', qty = 0) {
@@ -500,6 +545,7 @@ function calcRecipeTotalCost() {
 
 async function saveRecipe(e) {
   e.preventDefault();
+  const id = document.getElementById('recipeId').value;
   const name = document.getElementById('recipeName').value.trim();
   const yieldAmount = parseFloat(document.getElementById('recipeYieldAmount').value) || 1;
 
@@ -520,27 +566,69 @@ async function saveRecipe(e) {
   });
 
   try {
-    const { data: recipeData, error: recipeErr } = await supabaseClient.from('recipes').insert([{
-      name: name,
-      yieldamount: yieldAmount,
-      yieldunit: 'unidade',
-      laborcost: totalCost,
-    }]).select();
+    if (id) {
+      // 1. Atualiza dados principais da receita existente
+      const { error: updateErr } = await supabaseClient.from('recipes').update({
+        name: name,
+        yieldamount: yieldAmount,
+        yieldunit: 'unidade',
+        laborcost: totalCost,
+      }).eq('id', id);
 
-    if (recipeErr) throw recipeErr;
+      if (updateErr) throw updateErr;
 
-    const newRecipeId = recipeData[0].id;
-    if (itemsToSave.length > 0) {
-      const itemsPayload = itemsToSave.map(item => ({ ...item, recipeid: newRecipeId }));
-      await supabaseClient.from('recipe_ingredients').insert(itemsPayload);
+      // 2. Remove ingredientes antigos desta receita
+      await supabaseClient.from('recipe_ingredients').delete().eq('recipeid', id);
+
+      // 3. Insere os novos ingredientes atualizados
+      if (itemsToSave.length > 0) {
+        const itemsPayload = itemsToSave.map(item => ({ ...item, recipeid: id }));
+        await supabaseClient.from('recipe_ingredients').insert(itemsPayload);
+      }
+
+      showToast(`Receita "${name}" atualizada com sucesso!`, 'success');
+    } else {
+      // 1. Cadastra nova receita
+      const { data: recipeData, error: recipeErr } = await supabaseClient.from('recipes').insert([{
+        name: name,
+        yieldamount: yieldAmount,
+        yieldunit: 'unidade',
+        laborcost: totalCost,
+      }]).select();
+
+      if (recipeErr) throw recipeErr;
+
+      const newRecipeId = recipeData[0].id;
+      if (itemsToSave.length > 0) {
+        const itemsPayload = itemsToSave.map(item => ({ ...item, recipeid: newRecipeId }));
+        await supabaseClient.from('recipe_ingredients').insert(itemsPayload);
+      }
+
+      showToast('Receita cadastrada com sucesso!', 'success');
     }
 
-    showToast('Receita cadastrada com sucesso!', 'success');
     closeModal('recipeModal');
     await loadAllData();
   } catch (error) {
     console.error('Erro ao salvar receita:', error);
     showToast('Erro ao salvar receita.', 'error');
+  }
+}
+
+async function deleteRecipe(recipeId, recipeName) {
+  if (!confirm(`Tem certeza que deseja excluir a receita "${recipeName}"?\nEsta ação não poderá ser desfeita.`)) {
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient.from('recipes').delete().eq('id', recipeId);
+    if (error) throw error;
+
+    showToast(`Receita "${recipeName}" excluída com sucesso!`, 'info');
+    await loadAllData();
+  } catch (err) {
+    console.error('Erro ao excluir receita:', err);
+    showToast('Erro ao excluir receita.', 'error');
   }
 }
 
@@ -573,8 +661,11 @@ function renderProductsTable(list) {
     return `
       <tr>
         <td>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="width:36px; height:36px; border-radius:8px; background:#e0f2fe; display:flex; align-items:center; justify-content:center; font-size:18px;">🍰</div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            ${prod.imagePath 
+              ? `<img src="${escapeHtml(prod.imagePath)}" alt="${escapeHtml(prod.name)}" class="prod-avatar-img" onerror="this.outerHTML='<div class=\\'prod-avatar-fallback\\'>🍰</div>'">`
+              : `<div class="prod-avatar-fallback">🍰</div>`
+            }
             <div>
               <strong>${escapeHtml(prod.name)}</strong>
               <div style="font-size:11px; color:#64748b;">Rende ${prod.yieldAmount || 1} ${prod.unit || 'un'}</div>
@@ -588,10 +679,13 @@ function renderProductsTable(list) {
         <td><span class="badge-stock ${badgeClass}">${stock} ${prod.unit || 'un'}</span></td>
         <td>${minStock} ${prod.unit || 'un'}</td>
         <td><span class="badge-stock ${badgeClass}">${statusText}</span></td>
-        <td class="text-right">
+        <td class="text-right" style="white-space: nowrap;">
           <button class="btn btn-sm btn-secondary" onclick="openProductionForSpecificProduct(${prod.id})">+ Produzir</button>
-          <button class="btn-icon" title="Editar" onclick="openProductModal(${prod.id})">
+          <button class="btn-icon" title="Editar Produto" onclick="openProductModal(${prod.id})">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon delete" title="Excluir Produto" onclick="deleteProduct(${prod.id}, '${escapeHtml(prod.name)}')">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
           </button>
         </td>
       </tr>
@@ -603,6 +697,23 @@ function filterProducts() {
   const q = document.getElementById('prodSearchInput').value.toLowerCase();
   const filtered = productsList.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
   renderProductsTable(filtered);
+}
+
+async function deleteProduct(prodId, prodName) {
+  if (!confirm(`Tem certeza que deseja excluir o produto "${prodName}" do catálogo e do estoque?\nEsta ação não poderá ser desfeita.`)) {
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient.from('products').delete().eq('id', prodId);
+    if (error) throw error;
+
+    showToast(`Produto "${prodName}" excluído com sucesso!`, 'info');
+    await loadAllData();
+  } catch (err) {
+    console.error('Erro ao excluir produto:', err);
+    showToast('Erro ao excluir produto.', 'error');
+  }
 }
 
 // ==========================================================================
@@ -676,9 +787,10 @@ function renderQuickStock(list = productsList) {
       <div class="quick-stock-row ${cardStatusClass}" id="quick-row-${prod.id}" style="border-left: 10px solid ${theme.border};">
         <!-- COLUNA 1: PRODUTO -->
         <div class="quick-col-product" style="background: linear-gradient(90deg, ${theme.bg} 0%, #ffffff 100%);">
-          <div class="quick-prod-icon" style="background: ${theme.border}; color: #ffffff;">
-            ${theme.icon}
-          </div>
+          ${prod.imagePath
+            ? `<img src="${escapeHtml(prod.imagePath)}" alt="${escapeHtml(prod.name)}" class="quick-prod-thumb-img" style="border: 2px solid ${theme.border};" onerror="this.outerHTML='<div class=\\'quick-prod-icon\\' style=\\'background:${theme.border}; color:#ffffff;\\'>${theme.icon}</div>'">`
+            : `<div class="quick-prod-icon" style="background: ${theme.border}; color: #ffffff;">${theme.icon}</div>`
+          }
           <div class="quick-prod-info">
             <div class="quick-prod-name" style="color: ${theme.text};">
               ${escapeHtml(prod.name)}
@@ -834,6 +946,100 @@ function populateProductSelects() {
   }
 }
 
+// ==========================================================================
+// GESTÃO DE FOTOS E IMAGENS DE PRODUTOS
+// ==========================================================================
+function handleProductImageFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    showToast('Por favor selecione um arquivo de imagem válido (JPG, PNG, WebP).', 'warning');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      // Redimensiona para no máximo 600px mantendo a proporção para garantir leveza e rapidez
+      const maxDim = 600;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      document.getElementById('prodImagePath').value = compressedDataUrl;
+
+      // Atualiza visualização da prévia
+      const previewImg = document.getElementById('prodImagePreview');
+      const placeholder = document.getElementById('prodImagePlaceholder');
+      const btnRemove = document.getElementById('btnRemoveImage');
+
+      if (previewImg) {
+        previewImg.src = compressedDataUrl;
+        previewImg.style.display = 'block';
+      }
+      if (placeholder) placeholder.style.display = 'none';
+      if (btnRemove) btnRemove.style.display = 'inline-flex';
+
+      showToast('Foto do produto carregada com sucesso!', 'success');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleProductImageUrl(url) {
+  const trimmed = (url || '').trim();
+  const previewImg = document.getElementById('prodImagePreview');
+  const placeholder = document.getElementById('prodImagePlaceholder');
+  const btnRemove = document.getElementById('btnRemoveImage');
+
+  if (trimmed) {
+    if (previewImg) {
+      previewImg.src = trimmed;
+      previewImg.style.display = 'block';
+    }
+    if (placeholder) placeholder.style.display = 'none';
+    if (btnRemove) btnRemove.style.display = 'inline-flex';
+  } else {
+    removeProductImage();
+  }
+}
+
+function removeProductImage() {
+  document.getElementById('prodImagePath').value = '';
+  const fileInput = document.getElementById('prodImageFile');
+  if (fileInput) fileInput.value = '';
+
+  const previewImg = document.getElementById('prodImagePreview');
+  const placeholder = document.getElementById('prodImagePlaceholder');
+  const btnRemove = document.getElementById('btnRemoveImage');
+
+  if (previewImg) {
+    previewImg.src = '';
+    previewImg.style.display = 'none';
+  }
+  if (placeholder) placeholder.style.display = 'flex';
+  if (btnRemove) btnRemove.style.display = 'none';
+}
+
 function openProductModal(prodId = null) {
   populateProductSelects();
   const prod = productsList.find(p => p.id === prodId);
@@ -846,6 +1052,32 @@ function openProductModal(prodId = null) {
   document.getElementById('prodStock').value = prod ? prod.stock || 0 : '0';
   document.getElementById('prodMinStock').value = prod ? prod.minStock || 5 : '5';
   document.getElementById('prodUnit').value = prod ? prod.unit || 'unidade' : 'unidade';
+
+  // Configuração da Imagem do Produto
+  const imagePath = prod && prod.imagePath ? prod.imagePath : '';
+  document.getElementById('prodImagePath').value = imagePath;
+  const fileInput = document.getElementById('prodImageFile');
+  if (fileInput) fileInput.value = '';
+
+  const previewImg = document.getElementById('prodImagePreview');
+  const placeholder = document.getElementById('prodImagePlaceholder');
+  const btnRemove = document.getElementById('btnRemoveImage');
+
+  if (imagePath) {
+    if (previewImg) {
+      previewImg.src = imagePath;
+      previewImg.style.display = 'block';
+    }
+    if (placeholder) placeholder.style.display = 'none';
+    if (btnRemove) btnRemove.style.display = 'inline-flex';
+  } else {
+    if (previewImg) {
+      previewImg.src = '';
+      previewImg.style.display = 'none';
+    }
+    if (placeholder) placeholder.style.display = 'flex';
+    if (btnRemove) btnRemove.style.display = 'none';
+  }
 
   document.getElementById('productModalTitle').textContent = prod ? 'Editar Produto & Estoque' : 'Cadastrar Produto & Estoque';
   openModal('productModal');
@@ -882,6 +1114,7 @@ async function saveProduct(e) {
   const payload = {
     name: document.getElementById('prodName').value.trim(),
     category: document.getElementById('prodCategory').value.trim() || 'Geral',
+    imagePath: document.getElementById('prodImagePath').value.trim() || null,
     sellPrice: parseFloat(document.getElementById('prodSellPrice').value) || 0,
     ifoodPrice: parseFloat(document.getElementById('prodIfoodPrice').value) || 0,
     stock: parseFloat(document.getElementById('prodStock').value) || 0,
