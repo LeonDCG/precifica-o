@@ -9,13 +9,15 @@ let ingredientsList = [];
 let recipesList = [];
 let recipeIngredientsList = [];
 let productRecipesList = [];
+let productExpensesList = [];
 let productsList = [];
 let salesList = [];
 let movementsList = [];
 
-// AGRUPAMENTO DE RECEITAS
+// MODOS E AGRUPAMENTOS
 let collapsedRecipeGroups = new Set();
 let isRecipeGroupingEnabled = true;
+let activeProductViewMode = 'catalog'; // 'catalog' (cards do App) ou 'table' (estoque)
 
 // CHARTS INSTANCES
 let revenueProfitChartInstance = null;
@@ -64,7 +66,7 @@ function switchView(viewId) {
     dashboard: { title: 'Dashboard Geral', subtitle: 'Visão geral do faturamento, lucros e saúde do estoque pronto' },
     ingredients: { title: 'Cadastro de Ingredientes', subtitle: 'Gerencie insumos, custos unitários e fornecedores' },
     recipes: { title: 'Cadastro de Receitas', subtitle: 'Fichas técnicas com cálculo dinâmico de custo e rendimento' },
-    products: { title: 'Produtos & Estoque Pronto', subtitle: 'Preços, margens e controle completo de estoque de produtos acabados' },
+    products: { title: 'Catálogo de Produtos & Estoque Pronto', subtitle: 'Composição de receitas, insumos extras, precificação inteligente e estoque' },
     'quick-stock': { title: 'Estoque Rápido (+ / -)', subtitle: 'Painel visual de 2 colunas com botões rápidos de controle de estoque' },
     sales: { title: 'Registro de Vendas', subtitle: 'Lançamento de vendas com baixa automática de estoque e cálculo de lucro' },
   };
@@ -75,6 +77,9 @@ function switchView(viewId) {
 
   if (viewId === 'dashboard') {
     renderDashboard();
+  } else if (viewId === 'products') {
+    renderProductsCatalogGrid(productsList);
+    renderProductsTable(productsList);
   } else if (viewId === 'quick-stock') {
     renderQuickStock(productsList);
   }
@@ -90,12 +95,13 @@ function initDateInputs() {
 // CARREGAMENTO CENTRALIZADO DE DADOS
 async function loadAllData() {
   try {
-    const [ingRes, recRes, recIngRes, prodRes, prodRecRes, salesRes, movRes] = await Promise.all([
+    const [ingRes, recRes, recIngRes, prodRes, prodRecRes, prodExpRes, salesRes, movRes] = await Promise.all([
       supabaseClient.from('ingredients').select('*').order('name', { ascending: true }),
       supabaseClient.from('recipes').select('*').order('name', { ascending: true }),
       supabaseClient.from('recipe_ingredients').select('*'),
       supabaseClient.from('products').select('*').order('name', { ascending: true }),
       supabaseClient.from('product_recipes').select('*'),
+      supabaseClient.from('product_expenses').select('*'),
       supabaseClient.from('sales').select('*').order('saledate', { ascending: false }),
       supabaseClient.from('stock_movements').select('*').order('created_at', { ascending: false }),
     ]);
@@ -105,12 +111,14 @@ async function loadAllData() {
     recipeIngredientsList = recIngRes.data || [];
     productsList = prodRes.data || [];
     productRecipesList = prodRecRes.data || [];
+    productExpensesList = prodExpRes.data || [];
     salesList = salesRes.data || [];
     movementsList = movRes.data || [];
 
     renderDashboard();
     renderIngredientsTable(ingredientsList);
     renderRecipesTable(recipesList);
+    renderProductsCatalogGrid(productsList);
     renderProductsTable(productsList);
     renderQuickStock(productsList);
     renderSalesTable(salesList);
@@ -914,50 +922,268 @@ async function deleteRecipe(recipeId, recipeName) {
 }
 
 // ==========================================
-// 4. MÓDULO DE PRODUTOS & ESTOQUE PRONTO
+// 4. MÓDULO DE PRODUTOS & CATÁLOGO (CONCEITO DO APP)
 // ==========================================
+
+// Imagens gourmet de fallback (inspiradas no Catálogo do App)
+const GOURMET_PLACEHOLDERS = [
+  'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80', // Bolo Trufado
+  'https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?auto=format&fit=crop&w=800&q=80', // Torta Morango
+  'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80', // Confeitaria Croissant
+  'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&w=800&q=80', // Macarons Gourmet
+  'https://images.unsplash.com/photo-1550617931-e17a7b70dce2?auto=format&fit=crop&w=800&q=80', // Cupcakes
+];
+
+function getProductPlaceholderImage(idx) {
+  return GOURMET_PLACEHOLDERS[Math.abs(idx) % GOURMET_PLACEHOLDERS.length];
+}
+
+function getProductRecipesDetails(prodId) {
+  const links = productRecipesList.filter(pr => (pr.productid || pr.productId) === prodId);
+  return links.map(link => {
+    const rec = recipesList.find(r => r.id === (link.recipeid || link.recipeId));
+    const qty = Number(link.quantityused) || 1;
+    let cost = 0;
+    if (link.cost && Number(link.cost) > 0) {
+      cost = Number(link.cost);
+    } else if (rec) {
+      cost = getRecipeTotalCost(rec) * qty;
+    }
+    return {
+      recipeId: link.recipeid || link.recipeId,
+      recipeName: rec ? rec.name : (link.recipename || 'Receita'),
+      quantityUsed: qty,
+      cost: cost,
+      yieldUnit: rec ? (rec.yieldunit || 'un') : 'un'
+    };
+  });
+}
+
+function getProductExpensesDetails(prodId) {
+  const exps = productExpensesList.filter(pe => (pe.productid || pe.productId) === prodId);
+  return exps.map(e => ({
+    name: e.name || 'Insumo/Embalagem',
+    cost: Number(e.cost) || 0
+  }));
+}
+
 function getProductProductionCost(prod) {
   if (!prod) return 0;
 
-  // 1. Procurar nas fichas técnicas vinculadas (product_recipes)
-  const links = productRecipesList.filter(pr => (pr.productid || pr.productId) === prod.id);
-  if (links.length > 0) {
-    let totalBatchCost = 0;
-    for (const link of links) {
-      if (link.cost && Number(link.cost) > 0) {
-        totalBatchCost += Number(link.cost);
-      } else {
-        const rec = recipesList.find(r => r.id === (link.recipeid || link.recipeId));
-        if (rec) {
-          totalBatchCost += (getRecipeTotalCost(rec) * (Number(link.quantityused) || 1));
-        }
-      }
-    }
-    const yieldAmt = Number(prod.yieldAmount) || 1;
-    if (totalBatchCost > 0) {
-      return yieldAmt > 0 ? (totalBatchCost / yieldAmt) : totalBatchCost;
-    }
+  // 1. Procurar nas fichas técnicas vinculadas (product_recipes) e gastos extras (product_expenses)
+  const recipes = getProductRecipesDetails(prod.id);
+  const expenses = getProductExpensesDetails(prod.id);
+
+  let totalBatchCost = 0;
+  for (const r of recipes) {
+    totalBatchCost += r.cost;
+  }
+  for (const e of expenses) {
+    totalBatchCost += e.cost;
+  }
+
+  const yieldAmt = Number(prod.yieldAmount) || 1;
+  if (totalBatchCost > 0) {
+    return yieldAmt > 0 ? (totalBatchCost / yieldAmt) : totalBatchCost;
   }
 
   // 2. Se o produto tem suggestedPrice e margem configurada
   if (prod.suggestedPrice && Number(prod.suggestedPrice) > 0) {
     const margin = Number(prod.profitMarginPercent) || 30;
     const baseCost = Number(prod.suggestedPrice) / (1 + (margin / 100));
-    const yieldAmt = Number(prod.yieldAmount) || 1;
     return yieldAmt > 0 ? (baseCost / yieldAmt) : baseCost;
   }
 
   // 3. Estimativa a partir do preço de venda
   if (prod.sellPrice && Number(prod.sellPrice) > 0) {
     const margin = Number(prod.profitMarginPercent) || 30;
-    const yieldAmt = Number(prod.yieldAmount) || 1;
     if (yieldAmt > 1 && Number(prod.sellPrice) > 50) {
       return (Number(prod.sellPrice) / (1 + (margin / 100))) / yieldAmt;
     }
-    return Number(prod.sellPrice) * 0.40;
+    return (Number(prod.sellPrice) * 0.40) / (yieldAmt > 1 ? yieldAmt : 1);
   }
 
   return 0;
+}
+
+function switchProductViewMode(mode) {
+  activeProductViewMode = mode;
+  const btnCat = document.getElementById('btnViewCatalog');
+  const btnTab = document.getElementById('btnViewTable');
+  const catCont = document.getElementById('productsCatalogViewContainer');
+  const tabCont = document.getElementById('productsTableViewContainer');
+
+  if (mode === 'catalog') {
+    if (btnCat) btnCat.classList.add('active');
+    if (btnTab) btnTab.classList.remove('active');
+    if (catCont) catCont.style.display = 'block';
+    if (tabCont) tabCont.style.display = 'none';
+  } else {
+    if (btnCat) btnCat.classList.remove('active');
+    if (btnTab) btnTab.classList.add('active');
+    if (catCont) catCont.style.display = 'none';
+    if (tabCont) tabCont.style.display = 'block';
+  }
+}
+
+// RENDERIZAÇÃO DO CATÁLOGO DE PRODUTOS (CARDS GOURMET INSPIRADOS NO APP)
+function renderProductsCatalogGrid(list) {
+  const container = document.getElementById('productsCatalogGrid');
+  if (!container) return;
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 16px; color: #64748b;">
+        <div style="font-size: 40px; margin-bottom: 12px;">🍰</div>
+        <h3 style="font-size: 18px; color: #1e293b; margin-bottom: 6px;">Nenhum produto cadastrado no catálogo</h3>
+        <p style="font-size: 14px; margin-bottom: 20px;">Cadastre seu primeiro produto compondo receitas e embalagens.</p>
+        <button class="btn btn-primary" onclick="openProductModal()">+ Novo Produto</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Agrupar produtos por categoria (como no App)
+  const grouped = new Map();
+  list.forEach(p => {
+    const cat = (p.category || 'Geral').trim() || 'Geral';
+    if (!grouped.has(cat)) grouped.set(cat, []);
+    grouped.get(cat).push(p);
+  });
+
+  let html = '';
+
+  grouped.forEach((categoryProducts, categoryName) => {
+    html += `
+      <div class="catalog-category-header">
+        <h3 class="catalog-category-title">${escapeHtml(categoryName)}</h3>
+        <span class="catalog-category-count">${categoryProducts.length} itens</span>
+      </div>
+    `;
+
+    categoryProducts.forEach((prod, idx) => {
+      const yieldAmt = Number(prod.yieldAmount) || 1;
+      const unitName = escapeHtml(prod.unit || 'unidade');
+      const unitCost = getProductProductionCost(prod);
+      
+      const recipes = getProductRecipesDetails(prod.id);
+      const expenses = getProductExpensesDetails(prod.id);
+
+      const totalBatchCost = unitCost * yieldAmt;
+      const sellPrice = Number(prod.sellPrice) || 0;
+      const ifoodPrice = Number(prod.ifoodPrice) || 0;
+
+      const profitTotal = sellPrice - totalBatchCost;
+      const profitPerUnit = yieldAmt > 0 ? (profitTotal / yieldAmt) : profitTotal;
+      const isPositive = profitTotal >= 0;
+
+      const stock = Number(prod.stock) || 0;
+      const minStock = Number(prod.minStock) || 0;
+      let stockClass = 'badge-success';
+      let stockText = `${stock} ${unitName}`;
+
+      if (stock === 0) {
+        stockClass = 'badge-danger';
+        stockText = 'ZERADO';
+      } else if (stock <= minStock) {
+        stockClass = 'badge-warning';
+        stockText = `BAIXO (${stock})`;
+      }
+
+      const imageUrl = prod.imagePath && prod.imagePath.trim().length > 0 
+        ? escapeHtml(prod.imagePath) 
+        : getProductPlaceholderImage(prod.id || idx);
+
+      // Pills de composição (receitas e insumos)
+      let compChipsHtml = '';
+      if (recipes.length > 0) {
+        recipes.forEach(r => {
+          compChipsHtml += `<span class="composition-chip recipe" title="Ficha Técnica: ${escapeHtml(r.recipeName)} (Custo: ${formatBRL(r.cost)})">🥣 ${escapeHtml(r.recipeName)} ${r.quantityUsed > 1 ? '(x' + r.quantityUsed + ')' : ''}</span>`;
+        });
+      }
+      if (expenses.length > 0) {
+        expenses.forEach(e => {
+          compChipsHtml += `<span class="composition-chip expense" title="Insumo/Gasto: ${escapeHtml(e.name)} (${formatBRL(e.cost)})">📦 ${escapeHtml(e.name)}</span>`;
+        });
+      }
+      if (!compChipsHtml) {
+        compChipsHtml = `<span style="font-size: 12px; color: #94a3b8; font-style: italic;">Nenhuma receita associada (custo manual)</span>`;
+      }
+
+      html += `
+        <div class="catalog-product-card" id="catalog-card-${prod.id}">
+          <!-- MÍDIA DO CARD -->
+          <div class="catalog-card-media">
+            <img src="${imageUrl}" alt="${escapeHtml(prod.name)}" class="catalog-card-img" onerror="this.src='${getProductPlaceholderImage(idx)}'">
+            <div class="catalog-card-gradient"></div>
+
+            <!-- BADGES FLUTUANTES -->
+            <div class="catalog-media-badges">
+              ${(prod.isFeatured || idx === 0) ? `<span class="catalog-badge-featured">⭐ Destaque</span>` : ''}
+              <span class="catalog-badge-profit ${isPositive ? 'positive' : 'negative'}">
+                ${yieldAmt > 1 ? `LUCRO: ${formatBRL(profitPerUnit)} / ${unitName}` : `LUCRO: ${formatBRL(profitTotal)}`}
+              </span>
+            </div>
+
+            <!-- STATUS DO ESTOQUE FLUTUANTE -->
+            <div class="catalog-media-stock">
+              <span class="quick-status-badge ${stockClass}">📦 ${stockText}</span>
+            </div>
+
+            <!-- TÍTULO SOBREPOSTO AO GRADIENTE -->
+            <div class="catalog-media-title-overlay">
+              <div class="catalog-media-name">${escapeHtml(prod.name)}</div>
+              <div class="catalog-media-yield">Rende ${yieldAmt} ${unitName} • Custo Unitário: <strong>${formatBRL(unitCost)} / ${unitName}</strong></div>
+            </div>
+          </div>
+
+          <!-- CORPO DO CARD -->
+          <div class="catalog-card-body">
+            <!-- COMPOSIÇÃO DE RECEITAS E INSUMOS -->
+            <div class="catalog-composition-wrap">
+              <div class="catalog-composition-label">Composição Culinária & Insumos:</div>
+              <div class="catalog-composition-chips">
+                ${compChipsHtml}
+              </div>
+            </div>
+
+            <!-- RODAPÉ DE PREÇOS -->
+            <div class="catalog-pricing-row">
+              <div class="catalog-price-block">
+                <span class="catalog-price-label">Preço Balcão</span>
+                <span class="catalog-price-val">${formatBRL(sellPrice)}</span>
+                ${yieldAmt > 1 ? `<span style="font-size:11px; color:#64748b;">${formatBRL(sellPrice / yieldAmt)} por ${unitName}</span>` : ''}
+              </div>
+
+              ${ifoodPrice > 0 ? `
+                <div class="catalog-price-block" style="text-align: right;">
+                  <span class="catalog-price-label" style="color: #ea1d2c;">iFood</span>
+                  <span class="catalog-price-val ifood">${formatBRL(ifoodPrice)}</span>
+                  ${yieldAmt > 1 ? `<span style="font-size:11px; color:#ea1d2c;">${formatBRL(ifoodPrice / yieldAmt)} por ${unitName}</span>` : ''}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- AÇÕES DO CARD -->
+          <div class="catalog-card-actions">
+            <button class="btn btn-sm btn-secondary" onclick="openProductionForSpecificProduct(${prod.id})" title="Registrar produção deste produto">
+              + Produzir
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="openProductModal(${prod.id})" title="Editar Produto, Receitas e Preço">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              <span>Editar</span>
+            </button>
+            <button class="btn-icon delete" style="min-height:44px; width:44px;" title="Excluir Produto" onclick="deleteProduct(${prod.id}, '${escapeHtml(prod.name)}')">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+  });
+
+  container.innerHTML = html;
 }
 
 function renderProductsTable(list) {
@@ -1020,17 +1246,26 @@ function renderProductsTable(list) {
 }
 
 function filterProducts() {
-  const q = document.getElementById('prodSearchInput').value.toLowerCase();
-  const filtered = productsList.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
+  const q = (document.getElementById('prodSearchInput')?.value || '').toLowerCase().trim();
+  const filtered = productsList.filter(p => 
+    p.name.toLowerCase().includes(q) || 
+    (p.category || '').toLowerCase().includes(q)
+  );
+  renderProductsCatalogGrid(filtered);
   renderProductsTable(filtered);
 }
 
 async function deleteProduct(prodId, prodName) {
-  if (!confirm(`Tem certeza que deseja excluir o produto "${prodName}" do catálogo e do estoque?\nEsta ação não poderá ser desfeita.`)) {
+  if (!confirm(`Tem certeza que deseja excluir o produto "${prodName}" do catálogo e do estoque?\nEsta ação excluirá também suas receitas e gastos vinculados.`)) {
     return;
   }
 
   try {
+    // 1. Remove dependências relacionais
+    await supabaseClient.from('product_recipes').delete().eq('productid', prodId);
+    await supabaseClient.from('product_expenses').delete().eq('productid', prodId);
+
+    // 2. Remove o produto principal
     const { error } = await supabaseClient.from('products').delete().eq('id', prodId);
     if (error) throw error;
 
@@ -1366,18 +1601,300 @@ function removeProductImage() {
   if (btnRemove) btnRemove.style.display = 'none';
 }
 
+function getRecipeOptionsForProduct(selectedRecipeId = '') {
+  const groups = new Map();
+  recipesList.forEach(r => {
+    const cat = getRecipeCategory(r.name);
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat).push(r);
+  });
+
+  let optionsHtml = '';
+  groups.forEach((recs, catName) => {
+    optionsHtml += `<optgroup label="${escapeHtml(catName)}">`;
+    recs.forEach(r => {
+      const cost = getRecipeTotalCost(r);
+      const isSel = (r.id == selectedRecipeId) ? 'selected' : '';
+      optionsHtml += `<option value="${r.id}" data-cost="${cost.toFixed(2)}" ${isSel}>${escapeHtml(r.name)} (${formatBRL(cost)})</option>`;
+    });
+    optionsHtml += `</optgroup>`;
+  });
+  return optionsHtml;
+}
+
+function addProductRecipeRow(recipeId = '', qty = 1) {
+  const container = document.getElementById('productRecipesListContainer');
+  if (!container) return;
+  const uniqueId = `prodRec_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
+  const div = document.createElement('div');
+  div.className = 'product-component-row';
+  div.id = uniqueId;
+
+  div.innerHTML = `
+    <div>
+      <select class="form-select prod-recipe-select" onchange="onProductRecipeRowChange('${uniqueId}')" required>
+        <option value="">Selecione uma receita da ficha técnica...</option>
+        ${getRecipeOptionsForProduct(recipeId)}
+      </select>
+    </div>
+    <div>
+      <input type="number" step="0.1" min="0.1" class="form-input prod-recipe-qty" value="${qty || 1}" placeholder="Qtd" oninput="onProductRecipeRowChange('${uniqueId}')" required title="Quantidade de lotes/receitas usadas">
+    </div>
+    <div class="component-cost-display prod-recipe-cost">
+      R$ 0,00
+    </div>
+    <div class="text-right">
+      <button type="button" class="btn-icon delete" title="Remover Receita" onclick="removeProductRecipeRow('${uniqueId}')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+    </div>
+  `;
+
+  container.appendChild(div);
+  onProductRecipeRowChange(uniqueId);
+}
+
+function removeProductRecipeRow(rowId) {
+  const el = document.getElementById(rowId);
+  if (el) el.remove();
+  calcProductFullPricing();
+}
+
+function onProductRecipeRowChange(rowId) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+
+  const sel = row.querySelector('.prod-recipe-select');
+  const qtyInput = row.querySelector('.prod-recipe-qty');
+  const costDiv = row.querySelector('.prod-recipe-cost');
+
+  const recId = sel ? parseInt(sel.value, 10) : null;
+  const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 0;
+
+  let cost = 0;
+  if (recId) {
+    const rec = recipesList.find(r => r.id === recId);
+    if (rec) {
+      cost = getRecipeTotalCost(rec) * qty;
+    }
+  }
+  if (costDiv) costDiv.textContent = formatBRL(cost);
+  calcProductFullPricing();
+}
+
+function addProductExpenseRow(expenseName = '', cost = 0) {
+  const container = document.getElementById('productExpensesListContainer');
+  if (!container) return;
+  const uniqueId = `prodExp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
+  const div = document.createElement('div');
+  div.className = 'product-component-row';
+  div.id = uniqueId;
+
+  // Sugestões automáticas dos insumos de embalagem cadastrados
+  const packagingSuggestions = ingredientsList.filter(i => {
+    const n = (i.name || '').toLowerCase();
+    return n.includes('embalag') || n.includes('saco') || n.includes('caixa') || n.includes('fita') || n.includes('acrílico') || (i.category || '').toLowerCase().includes('embalag');
+  });
+
+  const suggestionsOptions = packagingSuggestions.map(p => {
+    const unitPrice = p.quantity > 0 ? (p.price / p.quantity) : 0;
+    return `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${formatBRL(unitPrice)})</option>`;
+  }).join('');
+
+  div.innerHTML = `
+    <div>
+      <input type="text" class="form-input prod-expense-name" list="expList_${uniqueId}" placeholder="Ex: Embalagem Slice Cake, Saco Kraft" value="${escapeHtml(expenseName)}" oninput="onProductExpenseNameInput('${uniqueId}')" required>
+      <datalist id="expList_${uniqueId}">
+        <option value="Embalagem Slice Cake">
+        <option value="Saco Kraft">
+        <option value="Caixa de Transporte">
+        <option value="Etiqueta Personalizada">
+        <option value="Fita de Cetim">
+        <option value="Colherzinha / Guardanapo">
+        ${suggestionsOptions}
+      </datalist>
+    </div>
+    <div>
+      <input type="number" step="1" min="1" class="form-input prod-expense-qty" value="1" placeholder="Qtd" oninput="onProductExpenseRowChange('${uniqueId}')" title="Quantidade de unidades usadas">
+    </div>
+    <div>
+      <input type="number" step="0.01" min="0" class="form-input prod-expense-cost" value="${cost > 0 ? Number(cost).toFixed(2) : ''}" placeholder="Custo R$" oninput="onProductExpenseRowChange('${uniqueId}')" required>
+    </div>
+    <div class="text-right">
+      <button type="button" class="btn-icon delete" title="Remover Insumo/Gasto" onclick="removeProductExpenseRow('${uniqueId}')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+    </div>
+  `;
+
+  container.appendChild(div);
+  onProductExpenseRowChange(uniqueId);
+}
+
+function removeProductExpenseRow(rowId) {
+  const el = document.getElementById(rowId);
+  if (el) el.remove();
+  calcProductFullPricing();
+}
+
+function onProductExpenseNameInput(rowId) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+
+  const nameInput = row.querySelector('.prod-expense-name');
+  const costInput = row.querySelector('.prod-expense-cost');
+
+  if (nameInput && costInput && (!costInput.value || parseFloat(costInput.value) === 0)) {
+    const val = nameInput.value.trim().toLowerCase();
+    const matchedIng = ingredientsList.find(i => i.name.toLowerCase() === val);
+    if (matchedIng && matchedIng.quantity > 0) {
+      const unitPrice = matchedIng.price / matchedIng.quantity;
+      costInput.value = unitPrice.toFixed(2);
+    } else if (val.includes('embalagem slice')) {
+      costInput.value = '0.55';
+    } else if (val.includes('saco kraft')) {
+      costInput.value = '1.00';
+    }
+  }
+  onProductExpenseRowChange(rowId);
+}
+
+function onProductExpenseRowChange(rowId) {
+  calcProductFullPricing();
+}
+
+function calcProductFullPricing() {
+  // 1. Somar receitas
+  let recipesSubtotal = 0;
+  const recRows = document.querySelectorAll('#productRecipesListContainer .product-component-row');
+  recRows.forEach(row => {
+    const sel = row.querySelector('.prod-recipe-select');
+    const qtyInput = row.querySelector('.prod-recipe-qty');
+    const costDiv = row.querySelector('.prod-recipe-cost');
+
+    const recId = sel ? parseInt(sel.value, 10) : null;
+    const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 0;
+
+    let rowCost = 0;
+    if (recId) {
+      const rec = recipesList.find(r => r.id === recId);
+      if (rec) {
+        rowCost = getRecipeTotalCost(rec) * qty;
+      }
+    }
+    if (costDiv) costDiv.textContent = formatBRL(rowCost);
+    recipesSubtotal += rowCost;
+  });
+
+  const recSubEl = document.getElementById('productRecipesSubtotalPreview');
+  if (recSubEl) recSubEl.textContent = formatBRL(recipesSubtotal);
+
+  // 2. Somar gastos extras
+  let expensesSubtotal = 0;
+  const expRows = document.querySelectorAll('#productExpensesListContainer .product-component-row');
+  expRows.forEach(row => {
+    const qtyInput = row.querySelector('.prod-expense-qty');
+    const costInput = row.querySelector('.prod-expense-cost');
+
+    const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
+    const unitCost = parseFloat(costInput ? costInput.value : 0) || 0;
+    const rowCost = unitCost * qty;
+    expensesSubtotal += rowCost;
+  });
+
+  const expSubEl = document.getElementById('productExpensesSubtotalPreview');
+  if (expSubEl) expSubEl.textContent = formatBRL(expensesSubtotal);
+
+  // 3. Custo total do lote e por fatia
+  const totalBatchCost = recipesSubtotal + expensesSubtotal;
+  const yieldAmt = parseFloat(document.getElementById('prodYieldAmount')?.value) || 1;
+  const unitName = document.getElementById('prodUnit')?.value.trim() || 'fatia';
+  const unitCost = yieldAmt > 0 ? (totalBatchCost / yieldAmt) : totalBatchCost;
+
+  const totalCostEl = document.getElementById('previewProdTotalBatchCost');
+  const unitCostEl = document.getElementById('previewProdUnitCost');
+  if (totalCostEl) totalCostEl.textContent = formatBRL(totalBatchCost);
+  if (unitCostEl) unitCostEl.textContent = `${formatBRL(unitCost)} / ${unitName}`;
+
+  // 4. Margem de lucro e preço sugerido
+  const marginPercent = parseFloat(document.getElementById('prodMargin')?.value) || 30;
+  const suggestedBatchPrice = totalBatchCost * (1 + (marginPercent / 100));
+  const suggestedUnitPrice = yieldAmt > 0 ? (suggestedBatchPrice / yieldAmt) : suggestedBatchPrice;
+
+  const sugBatchEl = document.getElementById('previewProdSuggestedBatch');
+  const sugUnitEl = document.getElementById('previewProdSuggestedUnit');
+  if (sugBatchEl) sugBatchEl.textContent = formatBRL(suggestedBatchPrice);
+  if (sugUnitEl) sugUnitEl.textContent = `${formatBRL(suggestedUnitPrice)} / ${unitName}`;
+
+  // 5. Preço praticado de venda Balcão
+  const sellPriceInput = document.getElementById('prodSellPrice');
+  const sellPriceVal = parseFloat(sellPriceInput?.value) || 0;
+
+  const sellHelp = document.getElementById('previewSellPricePerUnitHelp');
+  if (sellHelp) {
+    if (sellPriceVal > 0) {
+      const sellPerUnit = yieldAmt > 0 ? (sellPriceVal / yieldAmt) : sellPriceVal;
+      sellHelp.textContent = `Venda por ${unitName}: ${formatBRL(sellPerUnit)}`;
+    } else {
+      sellHelp.textContent = `Venda por ${unitName}: R$ 0,00`;
+    }
+  }
+
+  // 6. Preço iFood sugerido (taxa 23%)
+  const ifoodHelp = document.getElementById('previewIfoodSuggestedHelp');
+  if (ifoodHelp) {
+    if (sellPriceVal > 0) {
+      const suggestedIfood = sellPriceVal / (1 - 0.23);
+      ifoodHelp.textContent = `Sugerido iFood (taxa 23%): ${formatBRL(suggestedIfood)}`;
+      const ifoodInput = document.getElementById('prodIfoodPrice');
+      if (ifoodInput && (!ifoodInput.value || parseFloat(ifoodInput.value) === 0)) {
+        ifoodInput.value = suggestedIfood.toFixed(2);
+      }
+    } else {
+      ifoodHelp.textContent = `Sugerido iFood (taxa 23%): R$ 0,00`;
+    }
+  }
+
+  // 7. Lucro projetado real (positivo ou negativo)
+  const realProfitBatch = sellPriceVal - totalBatchCost;
+  const realProfitUnit = yieldAmt > 0 ? (realProfitBatch / yieldAmt) : realProfitBatch;
+  const isPositive = realProfitBatch >= 0;
+
+  const profitBox = document.getElementById('productProfitBox');
+  const profitTitle = document.getElementById('profitCalloutTitle');
+  const profitBatchEl = document.getElementById('previewProfitBatch');
+  const profitUnitEl = document.getElementById('previewProfitUnit');
+
+  if (profitBox) {
+    if (isPositive) {
+      profitBox.className = 'product-profit-callout positive';
+      if (profitTitle) profitTitle.textContent = '✓ LUCRO PROJETADO (LOJA / BALCÃO)';
+    } else {
+      profitBox.className = 'product-profit-callout negative';
+      if (profitTitle) profitTitle.textContent = '⚠️ PREJUÍZO DETECTADO - AUMENTE O PREÇO DE VENDA';
+    }
+  }
+
+  if (profitBatchEl) profitBatchEl.textContent = formatBRL(realProfitBatch);
+  if (profitUnitEl) profitUnitEl.textContent = `${formatBRL(realProfitUnit)} / ${unitName}`;
+}
+
 function openProductModal(prodId = null) {
-  populateProductSelects();
   const prod = productsList.find(p => p.id === prodId);
 
   document.getElementById('prodId').value = prod ? prod.id : '';
   document.getElementById('prodName').value = prod ? prod.name : '';
-  document.getElementById('prodCategory').value = prod ? prod.category || '' : 'Geral';
-  document.getElementById('prodSellPrice').value = prod ? prod.sellPrice : '';
-  document.getElementById('prodIfoodPrice').value = prod && prod.ifoodPrice ? prod.ifoodPrice : '20.99';
-  document.getElementById('prodStock').value = prod ? prod.stock || 0 : '0';
-  document.getElementById('prodMinStock').value = prod ? prod.minStock || 5 : '5';
-  document.getElementById('prodUnit').value = prod ? prod.unit || 'unidade' : 'unidade';
+  document.getElementById('prodCategory').value = prod ? (prod.category || 'Slice Cakes') : 'Slice Cakes';
+  document.getElementById('prodYieldAmount').value = prod ? (prod.yieldAmount || 10) : 10;
+  document.getElementById('prodUnit').value = prod ? (prod.unit || 'fatia') : 'fatia';
+  document.getElementById('prodIsFeatured').checked = prod ? (prod.isFeatured == 1 || prod.isFeatured === true) : false;
+  document.getElementById('prodMargin').value = prod ? (prod.profitMarginPercent || 30) : 30;
+  document.getElementById('prodSellPrice').value = prod && prod.sellPrice ? prod.sellPrice : '';
+  document.getElementById('prodIfoodPrice').value = prod && prod.ifoodPrice ? prod.ifoodPrice : '';
+  document.getElementById('prodStock').value = prod ? (prod.stock || 0) : 0;
+  document.getElementById('prodMinStock').value = prod ? (prod.minStock || 5) : 5;
 
   // Configuração da Imagem do Produto
   const imagePath = prod && prod.imagePath ? prod.imagePath : '';
@@ -1405,62 +1922,155 @@ function openProductModal(prodId = null) {
     if (btnRemove) btnRemove.style.display = 'none';
   }
 
-  document.getElementById('productModalTitle').textContent = prod ? 'Editar Produto & Estoque' : 'Cadastrar Produto & Estoque';
+  // Limpa containers dinâmicos de receitas e gastos
+  const recContainer = document.getElementById('productRecipesListContainer');
+  const expContainer = document.getElementById('productExpensesListContainer');
+  if (recContainer) recContainer.innerHTML = '';
+  if (expContainer) expContainer.innerHTML = '';
+
+  if (prod) {
+    // Carrega receitas vinculadas existentes
+    const linkedRecs = productRecipesList.filter(pr => (pr.productid || pr.productId) === prod.id);
+    if (linkedRecs.length > 0) {
+      linkedRecs.forEach(pr => {
+        addProductRecipeRow(pr.recipeid || pr.recipeId, pr.quantityused || 1);
+      });
+    } else {
+      addProductRecipeRow();
+    }
+
+    // Carrega gastos extras vinculados existentes
+    const linkedExps = productExpensesList.filter(pe => (pe.productid || pe.productId) === prod.id);
+    if (linkedExps.length > 0) {
+      linkedExps.forEach(pe => {
+        addProductExpenseRow(pe.name, pe.cost);
+      });
+    } else {
+      addProductExpenseRow('Embalagem Slice Cake', 0.55);
+    }
+  } else {
+    // Novo Produto: Adiciona linhas iniciais limpas
+    addProductRecipeRow();
+    addProductExpenseRow('Embalagem Slice Cake', 0.55);
+  }
+
+  calcProductFullPricing();
+  document.getElementById('productModalTitle').textContent = prod ? 'Editar Produto & Precificação' : 'Cadastrar Produto & Precificação';
   openModal('productModal');
-}
-
-function onProductRecipeChange() {
-  const recId = document.getElementById('prodRecipeSelect').value;
-  const rec = recipesList.find(r => r.id == recId);
-  if (rec) {
-    const yieldAmount = rec.yieldamount || 1;
-    const unitCost = yieldAmount > 0 ? (rec.laborcost || 0) / yieldAmount : 0;
-    document.getElementById('prodCost').value = unitCost.toFixed(2);
-    calcProductPrices();
-  }
-}
-
-function calcProductPrices() {
-  const cost = parseFloat(document.getElementById('prodCost').value) || 0;
-  const margin = parseFloat(document.getElementById('prodMargin').value) || 100;
-  const sellPrice = cost * (1 + (margin / 100));
-
-  if (!document.getElementById('prodSellPrice').value || document.getElementById('prodSellPrice').value == '0') {
-    document.getElementById('prodSellPrice').value = sellPrice.toFixed(2);
-  }
-
-  // Preço iFood com taxa contratual de 26,2%
-  const ifood = sellPrice / 0.738;
-  document.getElementById('prodIfoodPrice').value = ifood.toFixed(2);
 }
 
 async function saveProduct(e) {
   e.preventDefault();
   const id = document.getElementById('prodId').value;
-  const payload = {
-    name: document.getElementById('prodName').value.trim(),
-    category: document.getElementById('prodCategory').value.trim() || 'Geral',
-    imagePath: document.getElementById('prodImagePath').value.trim() || null,
-    sellPrice: parseFloat(document.getElementById('prodSellPrice').value) || 0,
-    ifoodPrice: parseFloat(document.getElementById('prodIfoodPrice').value) || 0,
-    stock: parseFloat(document.getElementById('prodStock').value) || 0,
-    minStock: parseFloat(document.getElementById('prodMinStock').value) || 0,
-    unit: document.getElementById('prodUnit').value.trim() || 'unidade',
+  const yieldAmount = parseFloat(document.getElementById('prodYieldAmount').value) || 1;
+  const margin = parseFloat(document.getElementById('prodMargin').value) || 30;
+  const sellPrice = parseFloat(document.getElementById('prodSellPrice').value) || 0;
+  const ifoodPrice = parseFloat(document.getElementById('prodIfoodPrice').value) || 0;
+  const stock = parseFloat(document.getElementById('prodStock').value) || 0;
+  const minStock = parseFloat(document.getElementById('prodMinStock').value) || 0;
+  const unit = document.getElementById('prodUnit').value.trim() || 'fatia';
+  const isFeatured = document.getElementById('prodIsFeatured').checked ? 1 : 0;
+  const name = document.getElementById('prodName').value.trim();
+  const category = document.getElementById('prodCategory').value.trim() || 'Slice Cakes';
+  const imagePath = document.getElementById('prodImagePath').value.trim() || '';
+
+  // 1. Coletar receitas
+  const recipesToSave = [];
+  let totalCostFromRecipes = 0;
+  const recRows = document.querySelectorAll('#productRecipesListContainer .product-component-row');
+  recRows.forEach(row => {
+    const sel = row.querySelector('.prod-recipe-select');
+    const qtyInput = row.querySelector('.prod-recipe-qty');
+    const recId = sel ? parseInt(sel.value, 10) : null;
+    const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
+    if (recId) {
+      const rec = recipesList.find(r => r.id === recId);
+      const cost = rec ? (getRecipeTotalCost(rec) * qty) : 0;
+      totalCostFromRecipes += cost;
+      recipesToSave.push({
+        recipeid: recId,
+        quantityused: qty,
+        cost: cost
+      });
+    }
+  });
+
+  // 2. Coletar gastos extras
+  const expensesToSave = [];
+  let totalCostFromExpenses = 0;
+  const expRows = document.querySelectorAll('#productExpensesListContainer .product-component-row');
+  expRows.forEach(row => {
+    const nameInput = row.querySelector('.prod-expense-name');
+    const qtyInput = row.querySelector('.prod-expense-qty');
+    const costInput = row.querySelector('.prod-expense-cost');
+
+    const expName = nameInput ? nameInput.value.trim() : '';
+    const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
+    const unitCost = parseFloat(costInput ? costInput.value : 0) || 0;
+    const totalRowCost = unitCost * qty;
+
+    if (expName && totalRowCost > 0) {
+      totalCostFromExpenses += totalRowCost;
+      expensesToSave.push({
+        name: expName,
+        cost: totalRowCost
+      });
+    }
+  });
+
+  const totalCost = totalCostFromRecipes + totalCostFromExpenses;
+  const suggestedPrice = totalCost * (1 + (margin / 100));
+
+  const prodPayload = {
+    name,
+    category,
+    yieldAmount,
+    unit,
+    profitMarginPercent: margin,
+    suggestedPrice,
+    sellPrice,
+    ifoodPrice,
+    stock,
+    minStock,
+    isFeatured,
+    imagePath
   };
 
   try {
-    if (id) {
-      await supabaseClient.from('products').update(payload).eq('id', id);
-      showToast('Produto atualizado com sucesso!', 'success');
+    let savedProdId = id ? parseInt(id, 10) : null;
+    if (savedProdId) {
+      // 1. Atualiza produto existente
+      const { error: prodErr } = await supabaseClient.from('products').update(prodPayload).eq('id', savedProdId);
+      if (prodErr) throw prodErr;
     } else {
-      await supabaseClient.from('products').insert([payload]);
-      showToast('Produto cadastrado com sucesso!', 'success');
+      // 1. Cadastra novo produto
+      const { data: newProd, error: insertErr } = await supabaseClient.from('products').insert([prodPayload]).select().single();
+      if (insertErr) throw insertErr;
+      savedProdId = newProd.id;
     }
+
+    // 2. Atualiza atomicamente product_recipes
+    await supabaseClient.from('product_recipes').delete().eq('productid', savedProdId);
+    if (recipesToSave.length > 0) {
+      const prPayload = recipesToSave.map(pr => ({ ...pr, productid: savedProdId }));
+      const { error: prErr } = await supabaseClient.from('product_recipes').insert(prPayload);
+      if (prErr) console.warn('Aviso ao salvar product_recipes:', prErr);
+    }
+
+    // 3. Atualiza atomicamente product_expenses
+    await supabaseClient.from('product_expenses').delete().eq('productid', savedProdId);
+    if (expensesToSave.length > 0) {
+      const pePayload = expensesToSave.map(pe => ({ ...pe, productid: savedProdId }));
+      const { error: peErr } = await supabaseClient.from('product_expenses').insert(pePayload);
+      if (peErr) console.warn('Aviso ao salvar product_expenses:', peErr);
+    }
+
+    showToast(id ? `Produto "${name}" atualizado com sucesso!` : `Produto "${name}" cadastrado com sucesso!`, 'success');
     closeModal('productModal');
     await loadAllData();
   } catch (error) {
     console.error('Erro ao salvar produto:', error);
-    showToast('Erro ao salvar produto.', 'error');
+    showToast('Erro ao salvar produto no banco: ' + (error.message || error), 'error');
   }
 }
 
