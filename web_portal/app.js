@@ -59,6 +59,7 @@ function switchView(viewId) {
     ingredients: { title: 'Cadastro de Ingredientes', subtitle: 'Gerencie insumos, custos unitários e fornecedores' },
     recipes: { title: 'Cadastro de Receitas', subtitle: 'Fichas técnicas com cálculo dinâmico de custo e rendimento' },
     products: { title: 'Produtos & Estoque Pronto', subtitle: 'Preços, margens e controle completo de estoque de produtos acabados' },
+    'quick-stock': { title: 'Estoque Rápido (+ / -)', subtitle: 'Painel visual de 2 colunas com botões rápidos de controle de estoque' },
     sales: { title: 'Registro de Vendas', subtitle: 'Lançamento de vendas com baixa automática de estoque e cálculo de lucro' },
   };
 
@@ -68,6 +69,8 @@ function switchView(viewId) {
 
   if (viewId === 'dashboard') {
     renderDashboard();
+  } else if (viewId === 'quick-stock') {
+    renderQuickStock(productsList);
   }
 }
 
@@ -99,6 +102,7 @@ async function loadAllData() {
     renderIngredientsTable(ingredientsList);
     renderRecipesTable(recipesList);
     renderProductsTable(productsList);
+    renderQuickStock(productsList);
     renderSalesTable(salesList);
     updateStockAlerts();
     populateProductSelects();
@@ -107,6 +111,45 @@ async function loadAllData() {
     console.error('Erro ao carregar dados do Supabase:', error);
     showToast('Erro ao carregar dados do servidor.', 'error');
   }
+}
+
+function updateStockAlerts() {
+  const lowStockProducts = productsList.filter(p => (Number(p.stock) || 0) <= (Number(p.minStock) || 0));
+  const badge = document.getElementById('stockAlertBadge');
+  const banner = document.getElementById('lowStockBanner');
+  const alertCountEl = document.getElementById('dashStockAlertCount');
+  const textEl = document.getElementById('lowStockText');
+
+  if (badge) {
+    if (lowStockProducts.length > 0) {
+      badge.style.display = 'inline-block';
+      badge.textContent = lowStockProducts.length;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (banner && alertCountEl) {
+    if (lowStockProducts.length > 0) {
+      banner.style.display = 'flex';
+      if (textEl) {
+        textEl.textContent = `Há ${lowStockProducts.length} produto(s) no limite ou abaixo do estoque mínimo: ${lowStockProducts.map(p => p.name).slice(0, 3).join(', ')}${lowStockProducts.length > 3 ? '...' : ''}`;
+      }
+      alertCountEl.textContent = `${lowStockProducts.length} produto(s) em alerta!`;
+      alertCountEl.style.color = '#ef4444';
+    } else {
+      banner.style.display = 'none';
+      alertCountEl.textContent = 'Estoque regular e seguro';
+      alertCountEl.style.color = '#059669';
+    }
+  }
+
+  // Atualiza contadores do Estoque Rápido
+  const totalUnits = productsList.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
+  const totalEl = document.getElementById('quickStockTotalUnits');
+  const lowEl = document.getElementById('quickStockLowCount');
+  if (totalEl) totalEl.textContent = `${totalUnits} un`;
+  if (lowEl) lowEl.textContent = `${lowStockProducts.length} itens`;
 }
 
 // ==========================================
@@ -133,26 +176,8 @@ function renderDashboard() {
   const totalStockUnits = productsList.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
   document.getElementById('dashTotalStock').textContent = `${totalStockUnits} un`;
 
-  // Alertas de estoque
-  const lowStockProducts = productsList.filter(p => (Number(p.stock) || 0) <= (Number(p.minStock) || 0));
-  const badge = document.getElementById('stockAlertBadge');
-  const banner = document.getElementById('lowStockBanner');
-  const alertCountEl = document.getElementById('dashStockAlertCount');
-
-  if (lowStockProducts.length > 0) {
-    badge.style.display = 'inline-block';
-    badge.textContent = lowStockProducts.length;
-    banner.style.display = 'flex';
-    document.getElementById('lowStockText').textContent = 
-      `Há ${lowStockProducts.length} produto(s) no limite ou abaixo do estoque mínimo: ${lowStockProducts.map(p => p.name).slice(0, 3).join(', ')}${lowStockProducts.length > 3 ? '...' : ''}`;
-    alertCountEl.textContent = `${lowStockProducts.length} produto(s) em alerta!`;
-    alertCountEl.style.color = '#ef4444';
-  } else {
-    badge.style.display = 'none';
-    banner.style.display = 'none';
-    alertCountEl.textContent = 'Estoque regular e seguro';
-    alertCountEl.style.color = '#059669';
-  }
+  // Atualiza alertas
+  updateStockAlerts();
 
   // Tabela de Vendas Recentes no Dashboard
   const recentSalesBody = document.getElementById('dashRecentSalesBody');
@@ -248,15 +273,6 @@ function renderCharts() {
       plugins: { legend: { position: 'bottom' } }
     }
   });
-}
-
-function updateStockAlerts() {
-  const lowStockProducts = productsList.filter(p => (Number(p.stock) || 0) <= (Number(p.minStock) || 0));
-  const badge = document.getElementById('stockAlertBadge');
-  if (badge) {
-    badge.textContent = lowStockProducts.length;
-    badge.style.display = lowStockProducts.length > 0 ? 'inline-block' : 'none';
-  }
 }
 
 // ==========================================
@@ -588,6 +604,212 @@ function filterProducts() {
   const filtered = productsList.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
   renderProductsTable(filtered);
 }
+
+// ==========================================================================
+// 4.1 MÓDULO DE ESTOQUE RÁPIDO (2 COLUNAS: PRODUTO & QUANTIDADE)
+// ==========================================================================
+const PRODUCT_THEMES = [
+  { keywords: ['chocolate', 'cacau', 'choc'], bg: '#fdf7f2', border: '#854d0e', text: '#78350f', badgeBg: '#fef3c7', badgeText: '#92400e', icon: '🍫' },
+  { keywords: ['red velvet', 'velvet', 'vermelho'], bg: '#fdf2f2', border: '#dc2626', text: '#991b1b', badgeBg: '#fee2e2', badgeText: '#b91c1c', icon: '🌹' },
+  { keywords: ['maracuja', 'maracujá', 'tropical'], bg: '#fefce8', border: '#d97706', text: '#854d0e', badgeBg: '#fef08a', badgeText: '#854d0e', icon: '🟡' },
+  { keywords: ['cenoura', 'brigadeiro'], bg: '#fff7ed', border: '#ea580c', text: '#9a3412', badgeBg: '#ffedd5', badgeText: '#c2410c', icon: '🥕' },
+  { keywords: ['coco', 'beijinho', 'baunilha'], bg: '#f0fdf4', border: '#059669', text: '#065f46', badgeBg: '#d1fae5', badgeText: '#047857', icon: '🥥' },
+  { keywords: ['doce de leite', 'caramelo', 'ameixa'], bg: '#fef9c3', border: '#ca8a04', text: '#713f12', badgeBg: '#fef08a', badgeText: '#a16207', icon: '🍯' },
+  { keywords: ['cafe', 'café', 'moca', 'cappuccino'], bg: '#fdf8f6', border: '#573926', text: '#451a03', badgeBg: '#f5ebe0', badgeText: '#573926', icon: '☕' },
+  { keywords: ['morango', 'frutas vermelhas', 'amora'], bg: '#fff1f2', border: '#e11d48', text: '#9f1239', badgeBg: '#ffe4e6', badgeText: '#be123c', icon: '🍓' },
+  { keywords: ['limao', 'limão'], bg: '#f7fee7', border: '#65a30d', text: '#3f6212', badgeBg: '#ecfccb', badgeText: '#4d7c0f', icon: '🍋' },
+  { keywords: ['leite ninho', 'ninho', 'nutella'], bg: '#f8fafc', border: '#0284c7', text: '#0369a1', badgeBg: '#e0f2fe', badgeText: '#0284c7', icon: '🥛' },
+];
+
+const FALLBACK_PALETTES = [
+  { bg: '#eff6ff', border: '#2563eb', text: '#1e40af', badgeBg: '#dbeafe', badgeText: '#1d4ed8', icon: '🍰' },
+  { bg: '#f5f3ff', border: '#7c3aed', text: '#5b21b6', badgeBg: '#ede9fe', badgeText: '#6d28d9', icon: '🧁' },
+  { bg: '#ecfdf5', border: '#059669', text: '#065f46', badgeBg: '#d1fae5', badgeText: '#047857', icon: '🎂' },
+  { bg: '#fff1f2', border: '#e11d48', text: '#9f1239', badgeBg: '#ffe4e6', badgeText: '#be123c', icon: '🥧' },
+  { bg: '#fffbeb', border: '#d97706', text: '#92400e', badgeBg: '#fef3c7', badgeText: '#b45309', icon: '🍪' },
+  { bg: '#fdf4ff', border: '#c026d3', text: '#86198f', badgeBg: '#fae8ff', badgeText: '#a21caf', icon: '🍮' },
+];
+
+function getProductTheme(productName, index = 0) {
+  const norm = (productName || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  for (const t of PRODUCT_THEMES) {
+    if (t.keywords.some(k => norm.includes(k.normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) {
+      return t;
+    }
+  }
+  let hash = 0;
+  for (let i = 0; i < norm.length; i++) hash = norm.charCodeAt(i) + ((hash << 5) - hash);
+  const idx = Math.abs(hash + index) % FALLBACK_PALETTES.length;
+  return FALLBACK_PALETTES[idx];
+}
+
+function renderQuickStock(list = productsList) {
+  const container = document.getElementById('quickStockList');
+  if (!container) return;
+
+  updateStockAlerts();
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="text-center py-10 text-muted" style="font-size: 18px; padding: 40px 0;">Nenhum produto cadastrado no estoque.</div>';
+    return;
+  }
+
+  container.innerHTML = list.map((prod, idx) => {
+    const theme = getProductTheme(prod.name, idx);
+    const stock = Number(prod.stock) || 0;
+    const minStock = Number(prod.minStock) || 0;
+
+    let alertBadgeHtml = '';
+    let cardStatusClass = 'status-normal';
+
+    if (stock === 0) {
+      cardStatusClass = 'status-danger';
+      alertBadgeHtml = `<span class="quick-status-badge badge-danger">⚠️ ESGOTADO</span>`;
+    } else if (stock <= minStock) {
+      cardStatusClass = 'status-warning';
+      alertBadgeHtml = `<span class="quick-status-badge badge-warning">⚠️ BAIXO (Mín: ${minStock})</span>`;
+    } else {
+      alertBadgeHtml = `<span class="quick-status-badge badge-success">✓ DISPONÍVEL</span>`;
+    }
+
+    return `
+      <div class="quick-stock-row ${cardStatusClass}" id="quick-row-${prod.id}" style="border-left: 10px solid ${theme.border};">
+        <!-- COLUNA 1: PRODUTO -->
+        <div class="quick-col-product" style="background: linear-gradient(90deg, ${theme.bg} 0%, #ffffff 100%);">
+          <div class="quick-prod-icon" style="background: ${theme.border}; color: #ffffff;">
+            ${theme.icon}
+          </div>
+          <div class="quick-prod-info">
+            <div class="quick-prod-name" style="color: ${theme.text};">
+              ${escapeHtml(prod.name)}
+            </div>
+            <div class="quick-prod-details">
+              <span class="quick-detail-tag" style="background:${theme.badgeBg}; color:${theme.badgeText}; border: 1px solid ${theme.border}40;">
+                ${escapeHtml(prod.category || 'Geral')}
+              </span>
+              <span class="quick-price-tag">Balcão: <strong>${formatBRL(prod.sellPrice)}</strong></span>
+              ${prod.ifoodPrice > 0 ? `<span class="quick-price-tag ifood">iFood: <strong>${formatBRL(prod.ifoodPrice)}</strong></span>` : ''}
+              <span id="quick-badge-container-${prod.id}">${alertBadgeHtml}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUNA 2: QUANTIDADE (+ / -) -->
+        <div class="quick-col-quantity">
+          <button type="button" 
+                  class="quick-btn-step btn-minus" 
+                  title="Diminuir 1 unidade do estoque"
+                  onclick="adjustQuickStock(${prod.id}, -1)">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+
+          <div class="quick-qty-box">
+            <span class="quick-qty-number" id="quick-qty-${prod.id}" style="color: ${stock === 0 ? '#ef4444' : stock <= minStock ? '#d97706' : '#0f172a'};">
+              ${stock}
+            </span>
+            <span class="quick-qty-unit">${escapeHtml(prod.unit || 'un')}</span>
+          </div>
+
+          <button type="button" 
+                  class="quick-btn-step btn-plus" 
+                  title="Adicionar 1 unidade ao estoque"
+                  onclick="adjustQuickStock(${prod.id}, 1)">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterQuickStock() {
+  const input = document.getElementById('quickStockSearchInput');
+  const query = input ? input.value.toLowerCase().trim() : '';
+  if (!query) {
+    renderQuickStock(productsList);
+    return;
+  }
+  const filtered = productsList.filter(p => 
+    (p.name || '').toLowerCase().includes(query) || 
+    (p.category || '').toLowerCase().includes(query)
+  );
+  renderQuickStock(filtered);
+}
+
+async function adjustQuickStock(prodId, delta) {
+  const prod = productsList.find(p => p.id === prodId);
+  if (!prod) return;
+
+  const prevStock = Number(prod.stock) || 0;
+  const newStock = prevStock + delta;
+
+  if (newStock < 0) {
+    showToast(`O estoque de "${prod.name}" já está zerado!`, 'warning');
+    return;
+  }
+
+  // 1. Atualização Otimista Imediata
+  prod.stock = newStock;
+
+  const qtyEl = document.getElementById(`quick-qty-${prodId}`);
+  if (qtyEl) {
+    qtyEl.textContent = newStock;
+    qtyEl.style.color = newStock === 0 ? '#ef4444' : newStock <= (Number(prod.minStock) || 0) ? '#d97706' : '#0f172a';
+    qtyEl.classList.remove('pulse-anim');
+    void qtyEl.offsetWidth; // trigger reflow
+    qtyEl.classList.add('pulse-anim');
+  }
+
+  const badgeContainer = document.getElementById(`quick-badge-container-${prodId}`);
+  const rowEl = document.getElementById(`quick-row-${prodId}`);
+  const minStock = Number(prod.minStock) || 0;
+
+  if (badgeContainer && rowEl) {
+    rowEl.classList.remove('status-normal', 'status-warning', 'status-danger');
+    if (newStock === 0) {
+      rowEl.classList.add('status-danger');
+      badgeContainer.innerHTML = `<span class="quick-status-badge badge-danger">⚠️ ESGOTADO</span>`;
+    } else if (newStock <= minStock) {
+      rowEl.classList.add('status-warning');
+      badgeContainer.innerHTML = `<span class="quick-status-badge badge-warning">⚠️ BAIXO (Mín: ${minStock})</span>`;
+    } else {
+      rowEl.classList.add('status-normal');
+      badgeContainer.innerHTML = `<span class="quick-status-badge badge-success">✓ DISPONÍVEL</span>`;
+    }
+  }
+
+  updateStockAlerts();
+
+  // 2. Persistência Assíncrona no Supabase
+  try {
+    const { error: updateErr } = await supabaseClient
+      .from('products')
+      .update({ stock: newStock })
+      .eq('id', prodId);
+
+    if (updateErr) throw updateErr;
+
+    // Registra no histórico de movimentações
+    await supabaseClient.from('stock_movements').insert([{
+      product_id: prodId,
+      product_name: prod.name,
+      type: delta > 0 ? 'entrada' : 'saida',
+      quantity: Math.abs(delta),
+      previous_stock: prevStock,
+      new_stock: newStock,
+      reason: delta > 0 ? 'Ajuste Rápido (+1)' : 'Ajuste Rápido (-1)'
+    }]);
+
+    showToast(`Estoque de "${prod.name}": ${newStock} ${prod.unit || 'un'}`, 'info', 1600);
+  } catch (error) {
+    console.error('Erro ao atualizar estoque:', error);
+    // Reverter em caso de falha
+    prod.stock = prevStock;
+    renderQuickStock(productsList);
+    showToast(`Erro ao sincronizar estoque de "${prod.name}".`, 'error');
+  }
+}
+
 
 function populateProductSelects() {
   // Select no modal de produção
