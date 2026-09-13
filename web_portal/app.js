@@ -7,9 +7,15 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // CACHE EM MEMÓRIA LOCAL
 let ingredientsList = [];
 let recipesList = [];
+let recipeIngredientsList = [];
+let productRecipesList = [];
 let productsList = [];
 let salesList = [];
 let movementsList = [];
+
+// AGRUPAMENTO DE RECEITAS
+let collapsedRecipeGroups = new Set();
+let isRecipeGroupingEnabled = true;
 
 // CHARTS INSTANCES
 let revenueProfitChartInstance = null;
@@ -84,17 +90,21 @@ function initDateInputs() {
 // CARREGAMENTO CENTRALIZADO DE DADOS
 async function loadAllData() {
   try {
-    const [ingRes, recRes, prodRes, salesRes, movRes] = await Promise.all([
+    const [ingRes, recRes, recIngRes, prodRes, prodRecRes, salesRes, movRes] = await Promise.all([
       supabaseClient.from('ingredients').select('*').order('name', { ascending: true }),
       supabaseClient.from('recipes').select('*').order('name', { ascending: true }),
+      supabaseClient.from('recipe_ingredients').select('*'),
       supabaseClient.from('products').select('*').order('name', { ascending: true }),
+      supabaseClient.from('product_recipes').select('*'),
       supabaseClient.from('sales').select('*').order('saledate', { ascending: false }),
       supabaseClient.from('stock_movements').select('*').order('created_at', { ascending: false }),
     ]);
 
     ingredientsList = ingRes.data || [];
     recipesList = recRes.data || [];
+    recipeIngredientsList = recIngRes.data || [];
     productsList = prodRes.data || [];
+    productRecipesList = prodRecRes.data || [];
     salesList = salesRes.data || [];
     movementsList = movRes.data || [];
 
@@ -288,14 +298,13 @@ function renderIngredientsTable(list) {
   }
 
   tbody.innerHTML = list.map(ing => {
-    const unitPrice = (ing.quantity && ing.quantity > 0) ? (ing.price / ing.quantity) : 0;
     return `
       <tr>
         <td><strong>${escapeHtml(ing.name)}</strong></td>
         <td><span class="stat-badge blue">${escapeHtml(ing.category || 'Geral')}</span></td>
         <td>${ing.quantity} ${ing.unit}</td>
         <td>${formatBRL(ing.price)}</td>
-        <td class="text-green font-bold">${formatBRL(unitPrice)} / ${ing.unit}</td>
+        <td class="text-green font-bold">${formatUnitCost(ing.price, ing.quantity, ing.unit)}</td>
         <td>${escapeHtml(ing.supplier || '-')}</td>
         <td>${ing.expirationDate ? formatDateOnly(ing.expirationDate) : '-'}</td>
         <td class="text-right">
@@ -324,10 +333,21 @@ function filterIngredients() {
 function calcIngUnitCost() {
   const price = parseFloat(document.getElementById('ingPrice').value) || 0;
   const qty = parseFloat(document.getElementById('ingQuantity').value) || 0;
-  const unit = document.getElementById('ingUnit').value;
+  const unit = (document.getElementById('ingUnit').value || '').trim();
 
-  const cost = qty > 0 ? (price / qty) : 0;
-  document.getElementById('ingUnitCostPreview').textContent = `${formatBRL(cost)} por ${unit}`;
+  if (qty <= 0) {
+    document.getElementById('ingUnitCostPreview').textContent = 'R$ 0,00';
+    return;
+  }
+  const unitPrice = price / qty;
+  const u = unit.toLowerCase();
+  if (u === 'g') {
+    document.getElementById('ingUnitCostPreview').textContent = `${formatBRL4(unitPrice)}/g (${formatBRL(unitPrice * 1000)}/kg)`;
+  } else if (u === 'ml') {
+    document.getElementById('ingUnitCostPreview').textContent = `${formatBRL4(unitPrice)}/ml (${formatBRL(unitPrice * 1000)}/L)`;
+  } else {
+    document.getElementById('ingUnitCostPreview').textContent = `${formatBRL(unitPrice)} por ${unit}`;
+  }
 }
 
 function openIngredientModal(ing = null) {
@@ -396,26 +416,273 @@ async function deleteIngredient(id) {
 // ==========================================
 let currentRecipeItems = [];
 
+// Funções de Apoio para Identificação e Agrupamento de Receitas
+function parseRecipeName(name) {
+  const clean = (name || '').trim();
+  const match = clean.match(/^(.*?)\s*\(\s*(\d+)\s*(?:ovos|ovo)\s*(?:-\s*(.*?))?\s*\)$/i);
+  if (match) {
+    const family = match[1].trim();
+    const eggCount = parseInt(match[2], 10);
+    const extra = match[3] ? ' - ' + match[3].trim() : '';
+    return {
+      isGrouped: true,
+      familyName: family,
+      eggCount: eggCount,
+      variantLabel: `${eggCount} Ovos${extra}`,
+      cleanName: clean
+    };
+  }
+  return {
+    isGrouped: false,
+    familyName: clean,
+    eggCount: null,
+    variantLabel: null,
+    cleanName: clean
+  };
+}
+
+function getRecipeCategory(name) {
+  const n = (name || '').toLowerCase();
+  if (n.startsWith('massa')) return 'Massas';
+  if (n.startsWith('brigadeiro')) return 'Brigadeiros';
+  if (n.startsWith('recheio')) return 'Recheios';
+  if (n.includes('geléia') || n.includes('geleia')) return 'Geléias';
+  if (n.includes('chantininho') || n.includes('chantilly')) return 'Chantillys';
+  if (n.includes('brownie')) return 'Brownies';
+  return 'Geral';
+}
+
+function getRecipeIcon(name, category) {
+  const cat = category || getRecipeCategory(name);
+  if (cat === 'Massas') return '🥣';
+  if (cat === 'Brigadeiros') return '🍫';
+  if (cat === 'Recheios') return '🍯';
+  if (cat === 'Geléias') return '🍓';
+  if (cat === 'Chantillys') return '🥛';
+  if (cat === 'Brownies') return '🧁';
+  return '🍰';
+}
+
+function getRecipeTotalCost(rec) {
+  if (!rec) return 0;
+  // Se temos a lista de ingredientes da receita carregada na memória
+  const items = recipeIngredientsList.filter(ri => (ri.recipeid || ri.recipeId) === rec.id);
+  if (items.length > 0) {
+    let sum = 0;
+    for (const item of items) {
+      const ing = ingredientsList.find(i => i.id === (item.ingredientid || item.ingredientId));
+      if (ing && ing.quantity > 0) {
+        sum += ((Number(ing.price) || 0) / Number(ing.quantity)) * (Number(item.quantityused) || 0);
+      } else if (item.cost) {
+        sum += Number(item.cost);
+      }
+    }
+    if (sum > 0) return sum;
+  }
+  return Number(rec.laborcost) || 0;
+}
+
+function toggleRecipeGrouping() {
+  isRecipeGroupingEnabled = !isRecipeGroupingEnabled;
+  const btn = document.getElementById('btnToggleRecipeGrouping');
+  const txt = document.getElementById('toggleGroupingText');
+  if (btn && txt) {
+    if (isRecipeGroupingEnabled) {
+      btn.classList.remove('btn-outline');
+      btn.classList.add('btn-secondary');
+      txt.textContent = 'Agrupado por Proporção';
+    } else {
+      btn.classList.remove('btn-secondary');
+      btn.classList.add('btn-outline');
+      txt.textContent = 'Lista Individual (Todas)';
+    }
+  }
+  filterRecipes();
+}
+
+function toggleRecipeGroupAccordion(groupKey) {
+  if (collapsedRecipeGroups.has(groupKey)) {
+    collapsedRecipeGroups.delete(groupKey);
+  } else {
+    collapsedRecipeGroups.add(groupKey);
+  }
+  filterRecipes();
+}
+
 function renderRecipesTable(list) {
   const tbody = document.getElementById('recipesTableBody');
   if (!tbody) return;
 
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Nenhuma receita cadastrada.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Nenhuma receita encontrada.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = list.map(rec => {
-    const yieldAmount = rec.yieldamount || 1;
-    const labor = rec.laborcost || 0;
-    return `
-      <tr>
-        <td><strong>${escapeHtml(rec.name)}</strong></td>
-        <td>${yieldAmount} ${escapeHtml(rec.yieldunit || 'un')}</td>
-        <td>${formatBRL(labor)}</td>
-        <td class="text-green font-bold">${formatBRL(yieldAmount > 0 ? labor / yieldAmount : 0)} / un</td>
+  if (!isRecipeGroupingEnabled) {
+    // Modo Lista Plana Individual
+    tbody.innerHTML = list.map(rec => {
+      const totalCost = getRecipeTotalCost(rec);
+      const yieldAmt = Number(rec.yieldamount) || 1;
+      const unitCost = yieldAmt > 0 ? (totalCost / yieldAmt) : totalCost;
+      const cat = getRecipeCategory(rec.name);
+      const icon = getRecipeIcon(rec.name, cat);
+
+      return `
+        <tr>
+          <td>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="recipe-single-icon">${icon}</span>
+              <div>
+                <strong>${escapeHtml(rec.name)}</strong>
+                <div><span class="stat-badge blue" style="font-size:11px;">${cat}</span></div>
+              </div>
+            </div>
+          </td>
+          <td>${yieldAmt} ${escapeHtml(rec.yieldunit || 'un')}</td>
+          <td><strong>${formatBRL(totalCost)}</strong></td>
+          <td class="text-green font-bold">${formatBRL(unitCost)} / ${escapeHtml(rec.yieldunit || 'un')}</td>
+          <td class="text-right" style="white-space: nowrap;">
+            <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${rec.id})" title="Registrar produção desta receita">+ Produzir</button>
+            <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${rec.id})">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn-icon delete" title="Excluir Receita" onclick="deleteRecipe(${rec.id}, '${escapeHtml(rec.name)}')">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    return;
+  }
+
+  // MODO AGRUPADO POR FAMÍLIA E PROPORÇÃO
+  const groups = new Map();
+  const standalones = [];
+
+  list.forEach(rec => {
+    const parsed = parseRecipeName(rec.name);
+    if (parsed.isGrouped) {
+      if (!groups.has(parsed.familyName)) {
+        groups.set(parsed.familyName, []);
+      }
+      groups.get(parsed.familyName).push({ ...rec, parsed });
+    } else {
+      standalones.push({ ...rec, parsed });
+    }
+  });
+
+  let html = '';
+
+  // 1. Renderiza Famílias Agrupadas
+  groups.forEach((variants, familyName) => {
+    variants.sort((a, b) => (a.parsed.eggCount || 0) - (b.parsed.eggCount || 0));
+
+    const totalCosts = variants.map(v => getRecipeTotalCost(v));
+    const minCost = Math.min(...totalCosts);
+    const maxCost = Math.max(...totalCosts);
+
+    const unitCosts = variants.map(v => {
+      const c = getRecipeTotalCost(v);
+      const y = Number(v.yieldamount) || 1;
+      return y > 0 ? c / y : c;
+    });
+    const minUnitCost = Math.min(...unitCosts);
+    const maxUnitCost = Math.max(...unitCosts);
+
+    const isCollapsed = collapsedRecipeGroups.has(familyName);
+    const cat = getRecipeCategory(familyName);
+    const icon = getRecipeIcon(familyName, cat);
+
+    const eggCounts = variants.map(v => v.parsed.eggCount).filter(Boolean);
+    const eggMin = Math.min(...eggCounts);
+    const eggMax = Math.max(...eggCounts);
+    const badgeText = `${variants.length} proporções (${eggMin} a ${eggMax} ovos)`;
+
+    const costRangeStr = minCost === maxCost ? formatBRL(minCost) : `${formatBRL(minCost)} ~ ${formatBRL(maxCost)}`;
+    const unitCostRangeStr = minUnitCost === maxUnitCost ? `${formatBRL(minUnitCost)} / un` : `${formatBRL(minUnitCost)} ~ ${formatBRL(maxUnitCost)} / un`;
+
+    html += `
+      <tr class="recipe-group-header-row" onclick="toggleRecipeGroupAccordion('${escapeHtml(familyName)}')" style="cursor: pointer;" title="Clique para expandir/recolher as proporções">
+        <td>
+          <div class="recipe-group-title-box">
+            <span class="recipe-group-chevron ${isCollapsed ? 'collapsed' : ''}">${isCollapsed ? '▶' : '▼'}</span>
+            <span class="recipe-group-icon">${icon}</span>
+            <div>
+              <span class="recipe-group-name">${escapeHtml(familyName)}</span>
+              <span class="recipe-group-badge">🥚 ${badgeText}</span>
+              <span class="stat-badge blue" style="margin-left: 6px; font-size: 11px;">${cat}</span>
+            </div>
+          </div>
+        </td>
+        <td><span style="color:#64748b; font-size:13px;">Varia por proporção</span></td>
+        <td><span class="recipe-group-cost-range">${costRangeStr}</span></td>
+        <td><span class="recipe-group-cost-range text-green font-bold">${unitCostRangeStr}</span></td>
         <td class="text-right" style="white-space: nowrap;">
-          <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${rec.id})" title="Registrar produção desta receita">+ Produzir</button>
+          <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); toggleRecipeGroupAccordion('${escapeHtml(familyName)}');">
+            ${isCollapsed ? 'Ver Proporções (' + variants.length + ')' : 'Recolher'}
+          </button>
+        </td>
+      </tr>
+    `;
+
+    if (!isCollapsed) {
+      variants.forEach(v => {
+        const vCost = getRecipeTotalCost(v);
+        const vYield = Number(v.yieldamount) || 1;
+        const vUnitCost = vYield > 0 ? (vCost / vYield) : vCost;
+
+        html += `
+          <tr class="recipe-variant-row">
+            <td>
+              <div style="display:flex; align-items:center; padding-left: 36px;">
+                <span class="variant-branch-line">└─</span>
+                <span class="variant-egg-badge">🥚 ${escapeHtml(v.parsed.variantLabel)}</span>
+                <span style="font-size:13px; color:#475569; margin-left: 8px;">${escapeHtml(v.name)}</span>
+              </div>
+            </td>
+            <td>${vYield} ${escapeHtml(v.yieldunit || 'un')}</td>
+            <td><strong>${formatBRL(vCost)}</strong></td>
+            <td class="text-green font-bold">${formatBRL(vUnitCost)} / ${escapeHtml(v.yieldunit || 'un')}</td>
+            <td class="text-right" style="white-space: nowrap;">
+              <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${v.id})" title="Registrar produção desta proporção">+ Produzir</button>
+              <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${v.id})">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="btn-icon delete" title="Excluir Receita" onclick="deleteRecipe(${v.id}, '${escapeHtml(v.name)}')">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+  });
+
+  // 2. Renderiza Receitas Individuais (Recheios, Brigadeiros, Geléias, etc.)
+  standalones.forEach(rec => {
+    const totalCost = getRecipeTotalCost(rec);
+    const yieldAmt = Number(rec.yieldamount) || 1;
+    const unitCost = yieldAmt > 0 ? (totalCost / yieldAmt) : totalCost;
+    const cat = getRecipeCategory(rec.name);
+    const icon = getRecipeIcon(rec.name, cat);
+
+    html += `
+      <tr>
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="recipe-single-icon">${icon}</span>
+            <div>
+              <strong>${escapeHtml(rec.name)}</strong>
+              <div><span class="stat-badge blue" style="font-size:11px;">${cat}</span></div>
+            </div>
+          </div>
+        </td>
+        <td>${yieldAmt} ${escapeHtml(rec.yieldunit || 'un')}</td>
+        <td><strong>${formatBRL(totalCost)}</strong></td>
+        <td class="text-green font-bold">${formatBRL(unitCost)} / ${escapeHtml(rec.yieldunit || 'un')}</td>
+        <td class="text-right" style="white-space: nowrap;">
+          <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${rec.id})" title="Registrar produção">+ Produzir</button>
           <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${rec.id})">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -425,12 +692,26 @@ function renderRecipesTable(list) {
         </td>
       </tr>
     `;
-  }).join('');
+  });
+
+  tbody.innerHTML = html;
 }
 
 function filterRecipes() {
-  const q = document.getElementById('recipeSearchInput').value.toLowerCase();
-  const filtered = recipesList.filter(r => r.name.toLowerCase().includes(q));
+  const q = (document.getElementById('recipeSearchInput')?.value || '').toLowerCase().trim();
+  const selectedCat = document.getElementById('recipeCategoryFilter')?.value || 'all';
+
+  const filtered = recipesList.filter(r => {
+    const nameMatch = r.name.toLowerCase().includes(q);
+    const parsed = parseRecipeName(r.name);
+    const familyMatch = parsed.familyName.toLowerCase().includes(q);
+    const variantMatch = parsed.variantLabel ? parsed.variantLabel.toLowerCase().includes(q) : false;
+    const cat = getRecipeCategory(r.name);
+    const categoryMatch = selectedCat === 'all' || cat.toLowerCase().startsWith(selectedCat.toLowerCase().trim());
+
+    return (nameMatch || familyMatch || variantMatch) && categoryMatch;
+  });
+
   renderRecipesTable(filtered);
 }
 
@@ -635,6 +916,50 @@ async function deleteRecipe(recipeId, recipeName) {
 // ==========================================
 // 4. MÓDULO DE PRODUTOS & ESTOQUE PRONTO
 // ==========================================
+function getProductProductionCost(prod) {
+  if (!prod) return 0;
+
+  // 1. Procurar nas fichas técnicas vinculadas (product_recipes)
+  const links = productRecipesList.filter(pr => (pr.productid || pr.productId) === prod.id);
+  if (links.length > 0) {
+    let totalBatchCost = 0;
+    for (const link of links) {
+      if (link.cost && Number(link.cost) > 0) {
+        totalBatchCost += Number(link.cost);
+      } else {
+        const rec = recipesList.find(r => r.id === (link.recipeid || link.recipeId));
+        if (rec) {
+          totalBatchCost += (getRecipeTotalCost(rec) * (Number(link.quantityused) || 1));
+        }
+      }
+    }
+    const yieldAmt = Number(prod.yieldAmount) || 1;
+    if (totalBatchCost > 0) {
+      return yieldAmt > 0 ? (totalBatchCost / yieldAmt) : totalBatchCost;
+    }
+  }
+
+  // 2. Se o produto tem suggestedPrice e margem configurada
+  if (prod.suggestedPrice && Number(prod.suggestedPrice) > 0) {
+    const margin = Number(prod.profitMarginPercent) || 30;
+    const baseCost = Number(prod.suggestedPrice) / (1 + (margin / 100));
+    const yieldAmt = Number(prod.yieldAmount) || 1;
+    return yieldAmt > 0 ? (baseCost / yieldAmt) : baseCost;
+  }
+
+  // 3. Estimativa a partir do preço de venda
+  if (prod.sellPrice && Number(prod.sellPrice) > 0) {
+    const margin = Number(prod.profitMarginPercent) || 30;
+    const yieldAmt = Number(prod.yieldAmount) || 1;
+    if (yieldAmt > 1 && Number(prod.sellPrice) > 50) {
+      return (Number(prod.sellPrice) / (1 + (margin / 100))) / yieldAmt;
+    }
+    return Number(prod.sellPrice) * 0.40;
+  }
+
+  return 0;
+}
+
 function renderProductsTable(list) {
   const tbody = document.getElementById('productsTableBody');
   if (!tbody) return;
@@ -647,6 +972,7 @@ function renderProductsTable(list) {
   tbody.innerHTML = list.map(prod => {
     const stock = Number(prod.stock) || 0;
     const minStock = Number(prod.minStock) || 0;
+    const prodUnitCost = getProductProductionCost(prod);
     let badgeClass = 'ok';
     let statusText = 'Estoque Regular';
 
@@ -675,7 +1001,7 @@ function renderProductsTable(list) {
         <td><span class="stat-badge blue">${escapeHtml(prod.category || 'Geral')}</span></td>
         <td><strong>${formatBRL(prod.sellPrice)}</strong></td>
         <td><span style="color:#ea1d2c; font-weight:700;">${prod.ifoodPrice > 0 ? formatBRL(prod.ifoodPrice) : '-'}</span></td>
-        <td>${formatBRL(prod.suggestedPrice ? prod.suggestedPrice / 2 : 0)}</td>
+        <td class="text-green font-bold">${formatBRL(prodUnitCost)} / ${escapeHtml(prod.unit || 'un')}</td>
         <td><span class="badge-stock ${badgeClass}">${stock} ${prod.unit || 'un'}</span></td>
         <td>${minStock} ${prod.unit || 'un'}</td>
         <td><span class="badge-stock ${badgeClass}">${statusText}</span></td>
@@ -1432,6 +1758,29 @@ function closeModal(id) {
 function formatBRL(val) {
   const num = Number(val) || 0;
   return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatBRL4(val) {
+  const num = Number(val) || 0;
+  return 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+}
+
+function formatUnitCost(price, qty, unit) {
+  const p = Number(price) || 0;
+  const q = Number(qty) || 0;
+  if (q <= 0) return 'R$ 0,00';
+  const u = (unit || '').toLowerCase().trim();
+  const unitPrice = p / q;
+
+  if (u === 'g') {
+    const perKg = unitPrice * 1000;
+    return `${formatBRL4(unitPrice)}/g <span style="font-size:11px; font-weight:normal; color:#64748b;">(${formatBRL(perKg)}/kg)</span>`;
+  }
+  if (u === 'ml') {
+    const perLiter = unitPrice * 1000;
+    return `${formatBRL4(unitPrice)}/ml <span style="font-size:11px; font-weight:normal; color:#64748b;">(${formatBRL(perLiter)}/L)</span>`;
+  }
+  return `${formatBRL(unitPrice)} / ${unit || 'un'}`;
 }
 
 function formatDate(dateStr) {

@@ -1393,5 +1393,122 @@ body {
   transform: scale(1.05);
 }
 
+/* ==========================================================================
+   11. AGRUPAMENTO INTELIGENTE DE RECEITAS POR PROPORÇÃO
+   ========================================================================== */
+.recipe-group-header-row {
+  background: linear-gradient(90deg, #f1f5f9 0%, #ffffff 100%);
+  border-top: 2px solid #e2e8f0;
+  border-bottom: 1.5px solid #cbd5e1;
+  font-size: 15px;
+  transition: background-color 0.15s ease;
+}
+
+.recipe-group-header-row:hover {
+  background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 100%) !important;
+}
+
+.recipe-group-title-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.recipe-group-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.recipe-group-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.recipe-group-icon {
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.recipe-group-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+}
+
+.recipe-group-badge {
+  display: inline-block;
+  background-color: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  margin-left: 8px;
+  border: 1px solid #fde68a;
+}
+
+.recipe-group-cost-range {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.recipe-variant-row {
+  background-color: #ffffff;
+  transition: background-color 0.15s ease;
+}
+
+.recipe-variant-row:hover {
+  background-color: #f8fafc;
+}
+
+.recipe-variant-row.collapsed {
+  display: none !important;
+}
+
+.variant-branch-line {
+  color: #94a3b8;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.variant-egg-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  background-color: #e0f2fe;
+  color: #0284c7;
+  font-size: 12px;
+  font-weight: 800;
+  border-radius: var(--radius-pill);
+  border: 1px solid #bae6fd;
+}
+
+.recipe-single-icon {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+
 
 

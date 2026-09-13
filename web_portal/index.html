@@ -242,12 +242,27 @@
         <div class="view-header">
           <div class="search-box">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="recipeSearchInput" class="input-search" placeholder="Buscar receita por nome..." oninput="filterRecipes()">
+            <input type="text" id="recipeSearchInput" class="input-search" placeholder="Buscar receita por nome, categoria ou proporção (ex: 3 ovos)..." oninput="filterRecipes()">
           </div>
-          <button class="btn btn-primary" onclick="openRecipeModal()">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            <span>+ Nova Receita</span>
-          </button>
+          <div class="view-actions">
+            <select id="recipeCategoryFilter" class="form-select" onchange="filterRecipes()" style="min-height: 48px; width: 170px;">
+              <option value="all">Todas Categorias</option>
+              <option value="Massas">Massas</option>
+              <option value="Recheios">Recheios</option>
+              <option value="Brigadeiros">Brigadeiros</option>
+              <option value="Geléias">Geléias</option>
+              <option value="Chantillys">Chantillys</option>
+              <option value="Brownies">Brownies</option>
+            </select>
+            <button id="btnToggleRecipeGrouping" class="btn btn-secondary" onclick="toggleRecipeGrouping()" title="Alternar agrupamento por proporções" style="min-height: 48px;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              <span id="toggleGroupingText">Agrupado por Proporção</span>
+            </button>
+            <button class="btn btn-primary" onclick="openRecipeModal()">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              <span>+ Nova Receita</span>
+            </button>
+          </div>
         </div>
 
         <div class="card">
@@ -255,7 +270,7 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Nome da Receita</th>
+                  <th>Receita / Família & Proporções</th>
                   <th>Rendimento</th>
                   <th>Custo Total dos Insumos</th>
                   <th>Custo Unitário / Porção</th>
