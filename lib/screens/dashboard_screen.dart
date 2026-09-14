@@ -31,12 +31,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _productCount = 0;
   double _monthlyTarget = 0.0;
   double _monthlyNetProfit = 0.0;
+  bool _hideValues = false;
 
   double get _hourlyRate => _workedHoursPerMonth > 0 ? _desiredSalary / _workedHoursPerMonth : 0.0;
 
   @override
   void initState() {
     super.initState();
+    final cachedSettings = DatabaseHelper.instance.cachedSettings;
+    if (cachedSettings != null && cachedSettings['hideDashboardValues'] != null) {
+      _hideValues = cachedSettings['hideDashboardValues'] == 'true';
+    }
     // Renderização instantânea se houver dados no cache
     final cachedSales = DatabaseHelper.instance.cachedSales;
     if (cachedSales != null) {
@@ -79,10 +84,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final salaryStr = settings['desiredSalary'];
       final hoursStr = settings['workedHoursPerMonth'];
       final targetStr = settings['salesTarget'];
+      final hideValuesStr = settings['hideDashboardValues'];
       
       if (salaryStr != null) _desiredSalary = double.tryParse(salaryStr) ?? 2000.0;
       if (hoursStr != null) _workedHoursPerMonth = double.tryParse(hoursStr) ?? 160.0;
       if (targetStr != null) _monthlyTarget = double.tryParse(targetStr) ?? 0.0;
+      if (hideValuesStr != null) _hideValues = hideValuesStr == 'true';
       
       _productCount = count;
       _calculateProfit(sales);
@@ -93,6 +100,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _toggleHideValues() {
+    setState(() {
+      _hideValues = !_hideValues;
+    });
+    DatabaseHelper.instance.saveSetting('hideDashboardValues', _hideValues.toString()).catchError((e) {
+      debugPrint('Erro ao salvar hideDashboardValues: $e');
+    });
   }
 
   Future<void> _showLaborConfigDialog() async {
@@ -284,8 +300,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               Text(
-                '$percent%',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                _hideValues ? '•••' : '$percent%',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  letterSpacing: _hideValues ? 1.5 : 0.0,
+                ),
               ),
             ],
           ),
@@ -294,30 +314,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'LUCRO DESTE MÊS',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white60 : Colors.grey[600],
-                    letterSpacing: 1.0,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'LUCRO DESTE MÊS',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white60 : Colors.grey[600],
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: _toggleHideValues,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white12 : Colors.grey[200],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _hideValues ? Icons.visibility_off : Icons.visibility,
+                              size: 14,
+                              color: isDark ? Colors.white70 : Colors.grey[700],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _hideValues ? 'Mostrar' : 'Ocultar',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white70 : Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'R\$ ${_monthlyNetProfit.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.primary,
+                GestureDetector(
+                  onTap: _toggleHideValues,
+                  child: Text(
+                    _hideValues ? 'R\$ •••••' : 'R\$ ${_monthlyNetProfit.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: _hideValues ? 1.5 : 0.0,
+                      color: progress >= 1.0 ? Colors.green : Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _monthlyTarget > 0 
-                      ? 'Meta: R\$ ${_monthlyTarget.toStringAsFixed(0)}'
+                      ? (_hideValues ? 'Meta: R\$ •••••' : 'Meta: R\$ ${_monthlyTarget.toStringAsFixed(0)}')
                       : 'Nenhuma meta de lucro definida.',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey,
+                    letterSpacing: _hideValues && _monthlyTarget > 0 ? 1.0 : 0.0,
+                  ),
                 ),
               ],
             ),
@@ -382,6 +445,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: Text('Doce & Ponto', style: GoogleFonts.merriweather(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
+          // Botão Olho (Ocultar/Mostrar Valores)
+          IconButton(
+            icon: Icon(
+              _hideValues ? Icons.visibility_off : Icons.visibility,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+            tooltip: _hideValues ? 'Mostrar valores' : 'Ocultar valores',
+            onPressed: _toggleHideValues,
+          ),
           // Botão minúsculo para Portal Web (Desktop)
           IconButton(
             icon: const Icon(Icons.laptop_chromebook, size: 18),
@@ -429,18 +501,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: const Icon(Icons.person, color: Colors.brown, size: 28),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _getGreeting(),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                      const Text(
-                        'Doce & Ponto Confeitaria',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getGreeting(),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                        const Text(
+                          'Doce & Ponto Confeitaria',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: isDark ? Colors.white10 : Colors.brown.withOpacity(0.08),
+                    ),
+                    icon: Icon(
+                      _hideValues ? Icons.visibility_off : Icons.visibility,
+                      color: isDark ? Colors.white : Theme.of(context).primaryColor,
+                      size: 22,
+                    ),
+                    tooltip: _hideValues ? 'Mostrar valores' : 'Ocultar valores',
+                    onPressed: _toggleHideValues,
                   ),
                 ],
               ),
@@ -572,7 +659,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text('R\$ ${_hourlyRate.toStringAsFixed(2)}', style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 32, color: Theme.of(context).primaryColor)),
+                              Text(
+                                _hideValues ? 'R\$ •••••' : 'R\$ ${_hourlyRate.toStringAsFixed(2)}', 
+                                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                  fontSize: 32, 
+                                  color: Theme.of(context).primaryColor,
+                                  letterSpacing: _hideValues ? 2.0 : 0.0,
+                                ),
+                              ),
                               const Padding(
                                 padding: EdgeInsets.only(bottom: 6.0, left: 4.0),
                                 child: Text('/hora', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
@@ -587,7 +681,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text('SALÁRIO DESEJADO', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                                    Text('R\$ ${_desiredSalary.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text(
+                                      _hideValues ? 'R\$ •••••' : 'R\$ ${_desiredSalary.toStringAsFixed(2)}', 
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: _hideValues ? 1.5 : 0.0,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -596,7 +696,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text('HORAS/MÊS', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                                    Text('${_workedHoursPerMonth.toStringAsFixed(0)}h', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text(
+                                      _hideValues ? '•••h' : '${_workedHoursPerMonth.toStringAsFixed(0)}h', 
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: _hideValues ? 1.5 : 0.0,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),

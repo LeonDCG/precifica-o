@@ -91,6 +91,12 @@
           <p id="pageSubtitle">Visão geral do faturamento, lucros e saúde do estoque pronto</p>
         </div>
         <div class="topbar-actions">
+          <button class="btn btn-secondary" id="btnToggleHideValues" onclick="toggleHideValues()" title="Ocultar ou mostrar valores na tela">
+            <span id="eyeIconWrapper" style="display: inline-flex; align-items: center;">
+              <svg id="eyeIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </span>
+            <span id="eyeBtnText">Ocultar Valores</span>
+          </button>
           <button class="btn btn-secondary" onclick="openProductionModal()">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
             <span>+ Produzir</span>
@@ -121,7 +127,7 @@
               <span class="stat-label">FATURAMENTO (MÊS)</span>
               <span class="stat-badge blue">Receita</span>
             </div>
-            <div class="stat-value" id="dashTotalRevenue">R$ 0,00</div>
+            <div class="stat-value" id="dashTotalRevenue" style="cursor: pointer;" onclick="toggleHideValues()" title="Clique para ocultar/mostrar valores">R$ 0,00</div>
             <div class="stat-footer positive" id="dashRevenueSub">Calculado em tempo real</div>
           </div>
           <div class="stat-card">
@@ -129,7 +135,7 @@
               <span class="stat-label">LUCRO LÍQUIDO (MÊS)</span>
               <span class="stat-badge green">Resultado</span>
             </div>
-            <div class="stat-value text-green" id="dashNetProfit">R$ 0,00</div>
+            <div class="stat-value text-green" id="dashNetProfit" style="cursor: pointer;" onclick="toggleHideValues()" title="Clique para ocultar/mostrar valores">R$ 0,00</div>
             <div class="stat-footer" id="dashProfitSub">Após deduções e comissões</div>
           </div>
           <div class="stat-card">

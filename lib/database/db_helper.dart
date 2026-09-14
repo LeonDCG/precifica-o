@@ -42,6 +42,7 @@ class DatabaseHelper {
   List<Sale>? get cachedSales => _cachedSales;
   List<Sale>? getCachedSellerSales(String sellerName) => _cachedSellerSales[sellerName.trim().toLowerCase()];
   List<RefrigeratorItem>? get cachedStock => _cachedStock;
+  Map<String, String>? get cachedSettings => _cachedSettings;
 
   // Futures em voo para desduplicar requisições concorrentes
   Future<List<Ingredient>>? _inFlightIngredients;

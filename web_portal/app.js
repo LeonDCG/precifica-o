@@ -23,11 +23,50 @@ let activeProductViewMode = 'catalog'; // 'catalog' (cards do App) ou 'table' (e
 let revenueProfitChartInstance = null;
 let channelChartInstance = null;
 
+// ESTADO DE VISIBILIDADE DE VALORES
+let hideValues = localStorage.getItem('hideDashboardValues') === 'true';
+
+function updateEyeButtonUI() {
+  const btnText = document.getElementById('eyeBtnText');
+  const iconWrap = document.getElementById('eyeIconWrapper');
+  if (btnText) {
+    btnText.textContent = hideValues ? 'Mostrar Valores' : 'Ocultar Valores';
+  }
+  if (iconWrap) {
+    if (hideValues) {
+      iconWrap.innerHTML = `
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+        </svg>
+      `;
+    } else {
+      iconWrap.innerHTML = `
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      `;
+    }
+  }
+}
+
+function toggleHideValues() {
+  hideValues = !hideValues;
+  localStorage.setItem('hideDashboardValues', hideValues ? 'true' : 'false');
+  updateEyeButtonUI();
+  renderDashboard();
+  if (typeof showToast === 'function') {
+    showToast(hideValues ? 'Valores ocultados na tela.' : 'Valores visíveis na tela.', 'info');
+  }
+}
+
 // INICIALIZAÇÃO DA APLICAÇÃO
 document.addEventListener('DOMContentLoaded', async () => {
   checkDeviceRestriction();
   setupNavigation();
   initDateInputs();
+  updateEyeButtonUI();
   await loadAllData();
 });
 
@@ -187,9 +226,9 @@ function renderDashboard() {
   const totalRev = monthSales.reduce((acc, s) => acc + (Number(s.totalvalue || s.totalValue) || 0), 0);
   const totalNetProfit = monthSales.reduce((acc, s) => acc + (Number(s.netprofit || s.netProfit) || 0), 0);
 
-  document.getElementById('dashTotalRevenue').textContent = formatBRL(totalRev);
-  document.getElementById('dashNetProfit').textContent = formatBRL(totalNetProfit);
-  document.getElementById('dashTotalSales').textContent = monthSales.length;
+  document.getElementById('dashTotalRevenue').textContent = hideValues ? 'R$ •••••' : formatBRL(totalRev);
+  document.getElementById('dashNetProfit').textContent = hideValues ? 'R$ •••••' : formatBRL(totalNetProfit);
+  document.getElementById('dashTotalSales').textContent = hideValues ? '••' : monthSales.length;
 
   const totalStockUnits = productsList.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
   document.getElementById('dashTotalStock').textContent = `${totalStockUnits} un`;
@@ -212,8 +251,8 @@ function renderDashboard() {
           <td><strong>${escapeHtml(s.productname || s.productName)}</strong></td>
           <td>${s.quantity} un</td>
           <td>${channelLabel}</td>
-          <td><strong>${formatBRL(s.totalvalue || s.totalValue)}</strong></td>
-          <td class="text-green font-bold">${formatBRL(s.netprofit || s.netProfit)}</td>
+          <td><strong>${hideValues ? 'R$ •••••' : formatBRL(s.totalvalue || s.totalValue)}</strong></td>
+          <td class="text-green font-bold">${hideValues ? 'R$ •••••' : formatBRL(s.netprofit || s.netProfit)}</td>
         </tr>
       `;
     }).join('');

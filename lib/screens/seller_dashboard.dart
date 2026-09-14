@@ -21,6 +21,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
   List<Sale> _sellerSales = [];
   Map<int, String> _productImages = {};
   double _monthlyCommission = 0.0;
+  bool _hideValues = false;
 
   @override
   void initState() {
@@ -105,6 +106,11 @@ class _SellerDashboardState extends State<SellerDashboard> {
         title: Text('Painel do Vendedor', style: GoogleFonts.merriweather(fontWeight: FontWeight.bold, fontSize: 18)),
         actions: [
           IconButton(
+            icon: Icon(_hideValues ? Icons.visibility_off : Icons.visibility),
+            tooltip: _hideValues ? 'Mostrar valores' : 'Ocultar valores',
+            onPressed: () => setState(() => _hideValues = !_hideValues),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,
             tooltip: 'Sair',
@@ -131,10 +137,13 @@ class _SellerDashboardState extends State<SellerDashboard> {
                     const SizedBox(height: 20),
 
                     // Apenas o lucro de venda dele (Total Commission)
-                    _buildMetricCard(
-                      'LUCRO TOTAL DE SUAS VENDAS',
-                      'R\$ ${_monthlyCommission.toStringAsFixed(2)}',
-                      const Color(0xFFD4AF37), // Dourado
+                    GestureDetector(
+                      onTap: () => setState(() => _hideValues = !_hideValues),
+                      child: _buildMetricCard(
+                        'LUCRO TOTAL DE SUAS VENDAS',
+                        _hideValues ? 'R\$ •••••' : 'R\$ ${_monthlyCommission.toStringAsFixed(2)}',
+                        const Color(0xFFD4AF37), // Dourado
+                      ),
                     ),
                     const SizedBox(height: 24),
 
@@ -310,7 +319,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
                                                       ),
                                                       const SizedBox(height: 2),
                                                       Text(
-                                                        'Total: R\$ ${sale.totalValue.toStringAsFixed(2)}',
+                                                        _hideValues ? 'Total: R\$ •••••' : 'Total: R\$ ${sale.totalValue.toStringAsFixed(2)}',
                                                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                                       ),
                                                     ],
@@ -319,7 +328,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
                                                     crossAxisAlignment: CrossAxisAlignment.end,
                                                     children: [
                                                       Text(
-                                                        'Seu Lucro: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
+                                                        _hideValues ? 'Seu Lucro: R\$ •••••' : 'Seu Lucro: R\$ ${sale.commissionValue.toStringAsFixed(2)}',
                                                         style: const TextStyle(
                                                           color: Colors.greenAccent,
                                                           fontWeight: FontWeight.bold,
