@@ -767,6 +767,23 @@ class _SalesScreenState extends State<SalesScreen> {
                                                     IconButton(
                                                       constraints: const BoxConstraints(),
                                                       padding: EdgeInsets.zero,
+                                                      tooltip: 'Editar Venda',
+                                                      icon: const Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
+                                                      onPressed: () async {
+                                                        final result = await Navigator.push(
+                                                          context,
+                                                          MaterialPageRoute(builder: (context) => AddSaleScreen(sale: sale)),
+                                                        );
+                                                        if (result == true) {
+                                                          _refreshSales();
+                                                        }
+                                                      },
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    IconButton(
+                                                      constraints: const BoxConstraints(),
+                                                      padding: EdgeInsets.zero,
+                                                      tooltip: 'Excluir Venda',
                                                       icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
                                                       onPressed: () async {
                                                         await DatabaseHelper.instance.deleteSale(sale.id!);

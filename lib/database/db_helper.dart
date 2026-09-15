@@ -621,6 +621,13 @@ class DatabaseHelper {
 
   Future<Sale> insertSale(Sale sale) => createSale(sale);
 
+  Future<int> updateSale(Sale sale) async {
+    var data = sale.toMap();
+    await _client.from('sales').update(data).eq('id', sale.id!);
+    clearSalesCache();
+    return 1;
+  }
+
   Future<List<Sale>> readAllSales({bool forceRefresh = false}) async {
     if (!forceRefresh && _cachedSales != null) {
       return _cachedSales!;

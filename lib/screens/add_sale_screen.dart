@@ -6,7 +6,9 @@ import '../models/profile.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddSaleScreen extends StatefulWidget {
-  const AddSaleScreen({super.key});
+  final Sale? sale;
+
+  const AddSaleScreen({super.key, this.sale});
 
   @override
   State<AddSaleScreen> createState() => _AddSaleScreenState();
@@ -28,6 +30,27 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
   double _commissionPercent = 30.0;
   String _saleUnitType = 'unit'; // 'unit' ou 'whole'
 
+  // Caldas e Embalagens enviadas
+  String _selectedSauce = 'none'; // 'none', 'Calda de Chocolate ao Leite', etc.
+  final Map<String, double> _saucePrices = {
+    'none': 0.0,
+    'Calda de Chocolate ao Leite': 0.71,
+    'Calda de Chocolate Branco': 0.71,
+    'Calda de Leite em Pó (Ninho)': 0.46,
+    'Geleia de Frutas Vermelhas': 0.57,
+  };
+
+  // Embalagens enviadas
+  bool _includeKraftBag = false; // Sacola Kraft (R$ 0,60)
+  bool _includeSlicePackage = true; // Embalagem Slice Cake (R$ 0,60)
+  bool _includeSauceCup = false; // Pote 30ml c/ tampa (R$ 0,42)
+  bool _includeFork = false; // Garfo plástico (R$ 0,07)
+
+  static const double _priceKraftBag = 0.60;
+  static const double _priceSlicePackage = 0.60;
+  static const double _priceSauceCup = 0.42;
+  static const double _priceFork = 0.07;
+
   // iFood settings:
   String _ifoodPlan = 'delivery'; // 'delivery' (Plano Entrega 26.2%), 'basic' (Plano Básico 15.2%), 'custom'
   double _ifoodRate = 26.2; // 26.2% comprovado no relatório oficial (23% comissão + 3.2% pagamento via app)
@@ -40,12 +63,102 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.sale != null) {
+      final s = widget.sale!;
+      _quantity = s.quantity;
+      _customSellPrice = s.quantity > 0 ? (s.totalValue / s.quantity) : s.totalValue;
+      _saleDate = s.saleDate;
+      String cleanNotes = s.notes;
+      cleanNotes = cleanNotes.replaceAll(RegExp(r'\[Pedido iFood #[^\]]+\]\s*'), '');
+      cleanNotes = cleanNotes.replaceAll(RegExp(r'\[[^\]]*(?:Calda|Embalagens|Sacola|Garfo)[^\]]*\]\s*'), '');
+      _notes = cleanNotes.trim();
+      _sellerType = s.sellerType;
+      _sellerName = s.sellerName;
+      _commissionPercent = s.commissionPercent > 0 ? s.commissionPercent : 30.0;
+      
+      if (s.productName.contains('(Inteiro)')) {
+        _saleUnitType = 'whole';
+      } else {
+        _saleUnitType = 'unit';
+      }
+
+      // Reconstruir seleções de caldas e embalagens a partir das observações gravadas
+      if (s.notes.contains('Calda de Chocolate ao Leite')) {
+        _selectedSauce = 'Calda de Chocolate ao Leite';
+      } else if (s.notes.contains('Calda de Chocolate Branco')) {
+        _selectedSauce = 'Calda de Chocolate Branco';
+      } else if (s.notes.contains('Calda de Leite em Pó (Ninho)')) {
+        _selectedSauce = 'Calda de Leite em Pó (Ninho)';
+      } else if (s.notes.contains('Geleia de Frutas Vermelhas')) {
+        _selectedSauce = 'Geleia de Frutas Vermelhas';
+      } else if (s.isIfood && _saleUnitType == 'unit') {
+        _selectedSauce = 'Calda de Chocolate ao Leite';
+      } else {
+        _selectedSauce = 'none';
+      }
+
+      if (s.notes.contains('Sacola Kraft') || s.isIfood) {
+        _includeKraftBag = true;
+      } else {
+        _includeKraftBag = false;
+      }
+
+      if (s.notes.contains('Embalagem Fatia')) {
+        _includeSlicePackage = true;
+      } else {
+        _includeSlicePackage = _saleUnitType == 'unit';
+      }
+
+      if (s.notes.contains('Pote 30ml')) {
+        _includeSauceCup = true;
+      } else {
+        _includeSauceCup = _selectedSauce != 'none';
+      }
+
+      if (s.notes.contains('Garfo') || s.isIfood) {
+        _includeFork = true;
+      } else {
+        _includeFork = false;
+      }
+
+      // Se for iFood, identificar plano e taxa
+      if (s.isIfood) {
+        _ifoodRate = s.commissionPercent > 0 ? s.commissionPercent : 26.2;
+        if ((_ifoodRate - 26.2).abs() < 0.1) {
+          _ifoodPlan = 'delivery';
+        } else if ((_ifoodRate - 15.2).abs() < 0.1) {
+          _ifoodPlan = 'basic';
+        } else {
+          _ifoodPlan = 'custom';
+        }
+        final match = RegExp(r'\[Pedido iFood #(\w+)\]').firstMatch(s.notes);
+        if (match != null) {
+          _ifoodOrderCode = match.group(1) ?? '';
+        }
+      }
+    }
+
     final cached = DatabaseHelper.instance.cachedProductsSummary;
     if (cached != null && cached.isNotEmpty) {
       _products = cached;
       _isLoading = false;
+      _matchProduct();
     }
     _loadProducts();
+  }
+
+  void _matchProduct() {
+    if (widget.sale != null && _products.isNotEmpty) {
+      try {
+        _selectedProduct = _products.firstWhere(
+          (p) => p.id == widget.sale!.productId,
+          orElse: () => _products.firstWhere(
+            (p) => widget.sale!.productName.toLowerCase().startsWith(p.name.toLowerCase().trim()),
+            orElse: () => _products.first,
+          ),
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> _loadProducts() async {
@@ -59,17 +172,31 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
       setState(() {
         _products = prods;
         _profile = profile;
-        if (_profile != null && _profile!.role == 'seller') {
+        if (_profile != null && _profile!.role == 'seller' && widget.sale == null) {
           _sellerType = 'other';
           _sellerName = _profile!.name;
           _commissionPercent = _profile!.commissionPercent;
         }
+        _matchProduct();
         _isLoading = false;
       });
     }
   }
 
-  double get _productCost {
+  double get _sauceCost => _saucePrices[_selectedSauce] ?? 0.0;
+
+  double get _packagingCost {
+    double cost = 0.0;
+    if (_includeKraftBag) cost += _priceKraftBag;
+    if (_includeSlicePackage && _saleUnitType == 'unit') cost += _priceSlicePackage;
+    if (_includeSauceCup && _selectedSauce != 'none') cost += _priceSauceCup;
+    if (_includeFork) cost += _priceFork;
+    return cost;
+  }
+
+  double get _complementsCost => _sauceCost + _packagingCost;
+
+  double get _baseProductCost {
     if (_selectedProduct == null) return 0.0;
     if (_saleUnitType == 'unit') {
       return _selectedProduct!.totalCost / _selectedProduct!.yieldAmount;
@@ -78,14 +205,19 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
     }
   }
 
+  double get _productCost => _baseProductCost + _complementsCost;
+
   double get _productPrice {
     if (_selectedProduct == null) return 0.0;
-    double basePrice;
     if (_sellerType == 'ifood' && _selectedProduct!.ifoodPrice > 0) {
-      basePrice = _selectedProduct!.ifoodPrice;
-    } else {
-      basePrice = _selectedProduct!.sellPrice > 0 ? _selectedProduct!.sellPrice : _selectedProduct!.suggestedPrice;
+      // O preço iFood cadastrado (ex: R$ 20,99) já é o preço praticado por fatia!
+      if (_saleUnitType == 'unit') {
+        return _selectedProduct!.ifoodPrice;
+      } else {
+        return _selectedProduct!.ifoodPrice * _selectedProduct!.yieldAmount;
+      }
     }
+    double basePrice = _selectedProduct!.sellPrice > 0 ? _selectedProduct!.sellPrice : _selectedProduct!.suggestedPrice;
     if (_saleUnitType == 'unit') {
       return basePrice / _selectedProduct!.yieldAmount;
     } else {
@@ -157,7 +289,26 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
         effectiveCommissionPercent = _commissionPercent;
       }
 
+      List<String> compDetails = [];
+      if (_selectedSauce != 'none') {
+        compDetails.add('Calda: $_selectedSauce');
+      }
+      List<String> embDetails = [];
+      if (_includeKraftBag) embDetails.add('Sacola Kraft');
+      if (_includeSlicePackage && _saleUnitType == 'unit') embDetails.add('Embalagem Fatia');
+      if (_includeSauceCup && _selectedSauce != 'none') embDetails.add('Pote 30ml');
+      if (_includeFork) embDetails.add('Garfo');
+
+      List<String> compParts = [];
+      if (compDetails.isNotEmpty) compParts.addAll(compDetails);
+      if (embDetails.isNotEmpty) compParts.add('Embalagens: ${embDetails.join(", ")}');
+      if (compParts.isNotEmpty) {
+        final compPrefix = '[${compParts.join(" | ")}]';
+        effectiveNotes = effectiveNotes.isEmpty ? compPrefix : '$compPrefix $effectiveNotes';
+      }
+
       final sale = Sale(
+        id: widget.sale?.id,
         productId: _selectedProduct!.id,
         productName: _selectedProduct!.name + suffix,
         quantity: _quantity,
@@ -173,22 +324,26 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
         notes: effectiveNotes,
       );
       
-      await DatabaseHelper.instance.createSale(sale);
-      if (_profile != null && _profile!.role == 'seller') {
-        await DatabaseHelper.instance.deductSellerStock(
-          _profile!.id,
-          sale.productId!,
-          _quantity,
-          yieldAmount: _selectedProduct!.yieldAmount,
-          isSliceSale: _saleUnitType == 'unit',
-        );
+      if (widget.sale != null) {
+        await DatabaseHelper.instance.updateSale(sale);
       } else {
-        await DatabaseHelper.instance.deductStockForProduct(
-          sale.productId!,
-          _quantity,
-          yieldAmount: _selectedProduct!.yieldAmount,
-          isSliceSale: _saleUnitType == 'unit',
-        );
+        await DatabaseHelper.instance.createSale(sale);
+        if (_profile != null && _profile!.role == 'seller') {
+          await DatabaseHelper.instance.deductSellerStock(
+            _profile!.id,
+            sale.productId!,
+            _quantity,
+            yieldAmount: _selectedProduct!.yieldAmount,
+            isSliceSale: _saleUnitType == 'unit',
+          );
+        } else {
+          await DatabaseHelper.instance.deductStockForProduct(
+            sale.productId!,
+            _quantity,
+            yieldAmount: _selectedProduct!.yieldAmount,
+            isSliceSale: _saleUnitType == 'unit',
+          );
+        }
       }
       if (mounted) Navigator.pop(context, true);
     }
@@ -204,7 +359,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Registrar Venda'),
+        title: Text(widget.sale == null ? 'Registrar Venda' : 'Editar Venda'),
         actions: [
           IconButton(
             icon: const Icon(Icons.check),
@@ -243,8 +398,10 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                   _customSellPrice = 0.0; // Reset preço customizado ao mudar produto
                   if (val != null && val.yieldAmount > 1) {
                     _saleUnitType = 'unit';
+                    _includeSlicePackage = true;
                   } else {
                     _saleUnitType = 'whole';
+                    _includeSlicePackage = false;
                   }
                 });
               },
@@ -310,7 +467,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                   Expanded(
                     child: TextFormField(
                       key: ValueKey('${_selectedProduct!.id}_${_sellerType}_$_saleUnitType'),
-                      initialValue: _productPrice.toStringAsFixed(2),
+                      initialValue: (_customSellPrice > 0 ? _customSellPrice : _productPrice).toStringAsFixed(2),
                       decoration: InputDecoration(
                         labelText: _sellerType == 'ifood' ? 'Preço iFood (R\$)' : 'Preço Praticado (R\$)',
                         border: const OutlineInputBorder(),
@@ -358,6 +515,11 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                         onTap: () => setState(() {
                           _sellerType = 'me';
                           _customSellPrice = 0.0;
+                          _selectedSauce = 'none';
+                          _includeKraftBag = false;
+                          _includeSlicePackage = _saleUnitType == 'unit';
+                          _includeSauceCup = false;
+                          _includeFork = false;
                         }),
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
@@ -397,6 +559,11 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                         onTap: () => setState(() {
                           _sellerType = 'ifood';
                           _customSellPrice = 0.0;
+                          _selectedSauce = 'Calda de Chocolate ao Leite';
+                          _includeKraftBag = true;
+                          _includeSlicePackage = _saleUnitType == 'unit';
+                          _includeSauceCup = true;
+                          _includeFork = true;
                         }),
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
@@ -436,6 +603,11 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                         onTap: () => setState(() {
                           _sellerType = 'other';
                           _customSellPrice = 0.0;
+                          _selectedSauce = 'none';
+                          _includeKraftBag = false;
+                          _includeSlicePackage = _saleUnitType == 'unit';
+                          _includeSauceCup = false;
+                          _includeFork = false;
                         }),
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
@@ -731,6 +903,8 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                 ],
               ],
               
+              _buildComplementsSection(),
+
               // Resumo Financeiro da Venda
               Container(
                 padding: const EdgeInsets.all(16),
@@ -765,8 +939,26 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Custo Total Proporcional (CMV):'),
-                          Text('R\$ ${_totalSaleCost.toStringAsFixed(2)}', style: const TextStyle(color: Colors.red)),
+                          const Text('Custo Produto (Base):'),
+                          Text('R\$ ${(_baseProductCost * _quantity).toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                      if (_complementsCost > 0) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Custo Embalagens & Calda:'),
+                            Text('+ R\$ ${(_complementsCost * _quantity).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.brown)),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Custo Total Proporcional (CMV):', style: TextStyle(fontWeight: FontWeight.w600)),
+                          Text('R\$ ${_totalSaleCost.toStringAsFixed(2)}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                         ],
                       ),
                       const Divider(height: 20),
@@ -828,6 +1020,7 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
               const SizedBox(height: 16),
               
               TextFormField(
+                initialValue: _notes,
                 maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'Observações (Opcional)',
@@ -839,6 +1032,183 @@ class _AddSaleScreenState extends State<AddSaleScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildComplementsSection() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.brown.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.inventory_2_outlined, size: 18, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'COMPLEMENTOS & EMBALAGENS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '+ R\$ ${_complementsCost.toStringAsFixed(2)} / un',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 1. Calda enviada
+          Row(
+            children: [
+              const Icon(Icons.water_drop_outlined, size: 15, color: Colors.brown),
+              const SizedBox(width: 6),
+              const Text(
+                'Calda Cortesia (Dose 30ml):',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              ChoiceChip(
+                label: const Text('Sem Calda'),
+                selected: _selectedSauce == 'none',
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedSauce = 'none';
+                      _includeSauceCup = false;
+                    });
+                  }
+                },
+              ),
+              ChoiceChip(
+                label: Text('Chocolate ao Leite (+R\$ ${_saucePrices['Calda de Chocolate ao Leite']!.toStringAsFixed(2)})'),
+                selected: _selectedSauce == 'Calda de Chocolate ao Leite',
+                selectedColor: Colors.brown.withValues(alpha: 0.2),
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedSauce = 'Calda de Chocolate ao Leite';
+                      _includeSauceCup = true;
+                    });
+                  }
+                },
+              ),
+              ChoiceChip(
+                label: Text('Chocolate Branco (+R\$ ${_saucePrices['Calda de Chocolate Branco']!.toStringAsFixed(2)})'),
+                selected: _selectedSauce == 'Calda de Chocolate Branco',
+                selectedColor: Colors.amber.withValues(alpha: 0.2),
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedSauce = 'Calda de Chocolate Branco';
+                      _includeSauceCup = true;
+                    });
+                  }
+                },
+              ),
+              ChoiceChip(
+                label: Text('Ninho (+R\$ ${_saucePrices['Calda de Leite em Pó (Ninho)']!.toStringAsFixed(2)})'),
+                selected: _selectedSauce == 'Calda de Leite em Pó (Ninho)',
+                selectedColor: Colors.blue.withValues(alpha: 0.15),
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedSauce = 'Calda de Leite em Pó (Ninho)';
+                      _includeSauceCup = true;
+                    });
+                  }
+                },
+              ),
+              ChoiceChip(
+                label: Text('Frutas Vermelhas (+R\$ ${_saucePrices['Geleia de Frutas Vermelhas']!.toStringAsFixed(2)})'),
+                selected: _selectedSauce == 'Geleia de Frutas Vermelhas',
+                selectedColor: Colors.red.withValues(alpha: 0.15),
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedSauce = 'Geleia de Frutas Vermelhas';
+                      _includeSauceCup = true;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 2. Embalagens e Descartáveis
+          Row(
+            children: [
+              const Icon(Icons.shopping_bag_outlined, size: 15, color: Colors.brown),
+              const SizedBox(width: 6),
+              const Text(
+                'Embalagens & Descartáveis Utilizados:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              FilterChip(
+                label: const Text('Sacola Kraft (+R\$ 0,60)'),
+                selected: _includeKraftBag,
+                onSelected: (val) => setState(() => _includeKraftBag = val),
+              ),
+              if (_saleUnitType == 'unit')
+                FilterChip(
+                  label: const Text('Embalagem Fatia (+R\$ 0,60)'),
+                  selected: _includeSlicePackage,
+                  onSelected: (val) => setState(() => _includeSlicePackage = val),
+                ),
+              FilterChip(
+                label: const Text('Pote 30ml c/ tampa (+R\$ 0,42)'),
+                selected: _includeSauceCup && _selectedSauce != 'none',
+                onSelected: _selectedSauce != 'none' 
+                    ? (val) => setState(() => _includeSauceCup = val)
+                    : null,
+              ),
+              FilterChip(
+                label: const Text('Garfo Plástico (+R\$ 0,07)'),
+                selected: _includeFork,
+                onSelected: (val) => setState(() => _includeFork = val),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

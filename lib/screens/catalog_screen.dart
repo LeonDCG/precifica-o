@@ -147,289 +147,280 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                 ...categoryProducts.map((product) {
                                   product.calculateSuggestedPrice();
                                   final imageUrl = product.imagePath.isNotEmpty ? product.imagePath : _getPlaceholderImage(product.id ?? 0);
-
-                                  return InkWell(
-                                    onTap: () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(builder: (context) => AddProductScreen(product: product)),
-                                      );
-                                      _refreshProducts();
-                                    },
-                                    child: Container(
-                                      margin: const EdgeInsets.only(bottom: 16),
-                                      height: 180,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.1),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 4),
-                                          )
-                                        ],
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 14),
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: BorderSide(
+                                        color: Theme.of(context).dividerColor.withValues(alpha: 0.12),
+                                        width: 1,
                                       ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: Stack(
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: InkWell(
+                                      onTap: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => AddProductScreen(product: product)),
+                                        );
+                                        _refreshProducts();
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            // Imagem de fundo real com AppCachedImage
-                                            Positioned.fill(
-                                              child: AppCachedImage(
-                                                imageUrl: imageUrl,
-                                                fit: BoxFit.cover,
-                                                cacheWidth: 600,
-                                                cacheHeight: 400,
-                                              ),
-                                            ),
-                                            // Gradiente escuro em baixo
-                                            Positioned(
-                                              bottom: 0, left: 0, right: 0,
-                                              height: 80,
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-                                                  gradient: LinearGradient(
-                                                    begin: Alignment.bottomCenter,
-                                                    end: Alignment.topCenter,
-                                                    colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                                            // Imagem Pequena (Thumbnail 82x82)
+                                            Stack(
+                                              children: [
+                                                ClipRRect(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  child: SizedBox(
+                                                    width: 82,
+                                                    height: 82,
+                                                    child: AppCachedImage(
+                                                      imageUrl: imageUrl,
+                                                      fit: BoxFit.cover,
+                                                      cacheWidth: 250,
+                                                      cacheHeight: 250,
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
+                                                if (product.isFeatured || _products.indexOf(product) == 0)
+                                                  Positioned(
+                                                    top: 4,
+                                                    left: 4,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFC29B62),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                      ),
+                                                      child: const Text(
+                                                        'TOP',
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 8,
+                                                          fontWeight: FontWeight.bold,
+                                                          letterSpacing: 0.5,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
                                             ),
-                                            // Selo de Destaque e Lucro
-                                            Positioned(
-                                              top: 16, left: 16,
+                                            const SizedBox(width: 12),
+
+                                            // Informações do Produto
+                                            Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  if (product.isFeatured || _products.indexOf(product) == 0)
-                                                    Container(
-                                                      margin: const EdgeInsets.only(bottom: 6),
-                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFFC29B62), // brandGold
-                                                        borderRadius: BorderRadius.circular(20), // Cápsula
-                                                      ),
-                                                      child: const Text(
-                                                        'DESTAQUE', 
-                                                        style: TextStyle(
-                                                          color: Colors.white, 
-                                                          fontSize: 9, 
-                                                          fontWeight: FontWeight.bold,
-                                                          letterSpacing: 0.8,
+                                                  // Linha superior: Nome e Ações
+                                                  Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text(
+                                                              product.name,
+                                                              style: GoogleFonts.merriweather(
+                                                                fontSize: 15,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                              maxLines: 2,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                            if (product.yieldAmount > 1)
+                                                              Padding(
+                                                                padding: const EdgeInsets.only(top: 2),
+                                                                child: Text(
+                                                                  'Rende ${product.yieldAmount.toInt()} ${product.unit}(s)',
+                                                                  style: TextStyle(
+                                                                    fontSize: 11,
+                                                                    color: Colors.grey[600],
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                          ],
                                                         ),
                                                       ),
-                                                    ),
-                                                  Builder(
-                                                    builder: (context) {
-                                                      final totalVal = product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice;
-                                                      final profit = totalVal - product.totalCost;
-                                                      final profitPerUnit = product.yieldAmount > 0 ? profit / product.yieldAmount : 0.0;
-                                                      final isPositive = profit >= 0;
-
-                                                      return Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                        decoration: BoxDecoration(
-                                                          color: isPositive ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE), // Pastel
-                                                          borderRadius: BorderRadius.circular(20), // Cápsula
-                                                        ),
-                                                        child: Text(
-                                                          product.yieldAmount > 1 
-                                                              ? 'LUCRO: R\$ ${profitPerUnit.toStringAsFixed(2)} / ${product.unit}'
-                                                              : 'LUCRO: R\$ ${profit.toStringAsFixed(2)}',
-                                                          style: TextStyle(
-                                                            color: isPositive ? const Color(0xFF2E7D32) : const Color(0xFFC62828), 
-                                                            fontSize: 9, 
-                                                            fontWeight: FontWeight.bold,
-                                                            letterSpacing: 0.5,
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-                                                  ),
-                                                  const SizedBox(height: 6),
-                                                  // Selo / Botão Preço iFood
-                                                  GestureDetector(
-                                                    onTap: () => _showIfoodPriceDialog(product),
-                                                    child: Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                                      decoration: BoxDecoration(
-                                                        color: product.ifoodPrice > 0 ? const Color(0xFFEA1D2C) : Colors.black.withValues(alpha: 0.65),
-                                                        borderRadius: BorderRadius.circular(20),
-                                                        border: product.ifoodPrice > 0
-                                                            ? null
-                                                            : Border.all(color: const Color(0xFFEA1D2C).withValues(alpha: 0.7), width: 1),
-                                                        boxShadow: [
-                                                          BoxShadow(
-                                                            color: Colors.black.withValues(alpha: 0.2),
-                                                            blurRadius: 4,
-                                                            offset: const Offset(0, 2),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      child: Row(
+                                                      // Ações
+                                                      Row(
                                                         mainAxisSize: MainAxisSize.min,
                                                         children: [
-                                                          const Icon(Icons.delivery_dining, color: Colors.white, size: 13),
-                                                          const SizedBox(width: 4),
-                                                          Text(
-                                                            product.ifoodPrice > 0
-                                                                ? 'iFood: R\$ ${product.ifoodPrice.toStringAsFixed(2)}'
-                                                                : '+ Preço iFood',
-                                                            style: const TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: 9.5,
-                                                              fontWeight: FontWeight.bold,
-                                                              letterSpacing: 0.4,
+                                                          IconButton(
+                                                            constraints: const BoxConstraints(),
+                                                            padding: const EdgeInsets.all(4),
+                                                            tooltip: 'Preço no iFood',
+                                                            icon: Icon(
+                                                              Icons.delivery_dining,
+                                                              size: 18,
+                                                              color: product.ifoodPrice > 0 ? const Color(0xFFEA1D2C) : Colors.grey[400],
                                                             ),
+                                                            onPressed: () => _showIfoodPriceDialog(product),
                                                           ),
-                                                          const SizedBox(width: 3),
-                                                          const Icon(Icons.edit, color: Colors.white70, size: 10),
+                                                          IconButton(
+                                                            constraints: const BoxConstraints(),
+                                                            padding: const EdgeInsets.all(4),
+                                                            tooltip: 'Compartilhar no WhatsApp',
+                                                            icon: const Icon(Icons.share, size: 16, color: Colors.green),
+                                                            onPressed: () async {
+                                                              final total = product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice;
+                                                              final fraction = product.yieldAmount > 1 ? (total / product.yieldAmount).toStringAsFixed(2) : '';
+                                                              
+                                                              String msg = 'Olá! Segue o detalhe do nosso produto:\n\n';
+                                                              msg += '🎂 *${product.name}*\n';
+                                                              if (product.yieldAmount > 1) {
+                                                                msg += '📦 Rende: ${product.yieldAmount.toInt()} ${product.unit}(s)\n';
+                                                                msg += '💰 Valor Total (Loja): R\$ ${total.toStringAsFixed(2)}\n';
+                                                                msg += '💵 Valor / ${product.unit}: R\$ $fraction\n';
+                                                              } else {
+                                                                msg += '💰 Valor (Loja): R\$ ${total.toStringAsFixed(2)} / ${product.unit}\n';
+                                                              }
+                                                              if (product.ifoodPrice > 0) {
+                                                                msg += '🛵 Valor no iFood: R\$ ${product.ifoodPrice.toStringAsFixed(2)}\n';
+                                                              }
+                                                              msg += '\nGostaria de fazer uma encomenda?';
+                                                              
+                                                              final url = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(msg)}');
+                                                              if (await canLaunchUrl(url)) {
+                                                                await launchUrl(url);
+                                                              }
+                                                            },
+                                                          ),
+                                                          IconButton(
+                                                            constraints: const BoxConstraints(),
+                                                            padding: const EdgeInsets.all(4),
+                                                            tooltip: 'Excluir Produto',
+                                                            icon: const Icon(Icons.delete_outline, size: 17, color: Colors.redAccent),
+                                                            onPressed: () async {
+                                                              await DatabaseHelper.instance.deleteProduct(product.id!);
+                                                              _refreshProducts();
+                                                            },
+                                                          ),
                                                         ],
                                                       ),
-                                                    ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 6),
+
+                                                  // Preço Loja
+                                                  Wrap(
+                                                    spacing: 6,
+                                                    runSpacing: 4,
+                                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                                    children: [
+                                                      Text(
+                                                        product.yieldAmount > 1
+                                                            ? 'R\$ ${((product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice) / product.yieldAmount).toStringAsFixed(2)} / ${product.unit}'
+                                                            : 'R\$ ${(product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice).toStringAsFixed(2)}',
+                                                        style: TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: Theme.of(context).colorScheme.primary,
+                                                        ),
+                                                      ),
+                                                      if (product.yieldAmount > 1)
+                                                        Text(
+                                                          '(Total R\$ ${(product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice).toStringAsFixed(2)})',
+                                                          style: TextStyle(fontSize: 10.5, color: Colors.grey[600]),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 6),
+
+                                                  // Badges iFood e Lucro
+                                                  Wrap(
+                                                    spacing: 6,
+                                                    runSpacing: 4,
+                                                    children: [
+                                                      // Badge iFood
+                                                      InkWell(
+                                                        onTap: () => _showIfoodPriceDialog(product),
+                                                        borderRadius: BorderRadius.circular(12),
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                          decoration: BoxDecoration(
+                                                            color: product.ifoodPrice > 0
+                                                                ? const Color(0xFFEA1D2C).withValues(alpha: 0.12)
+                                                                : Colors.grey.withValues(alpha: 0.12),
+                                                            borderRadius: BorderRadius.circular(12),
+                                                            border: Border.all(
+                                                              color: product.ifoodPrice > 0
+                                                                  ? const Color(0xFFEA1D2C).withValues(alpha: 0.4)
+                                                                  : Colors.grey.withValues(alpha: 0.3),
+                                                              width: 1,
+                                                            ),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            children: [
+                                                              Icon(
+                                                                Icons.delivery_dining,
+                                                                size: 13,
+                                                                color: product.ifoodPrice > 0 ? const Color(0xFFEA1D2C) : Colors.grey[600],
+                                                              ),
+                                                              const SizedBox(width: 3),
+                                                              Text(
+                                                                product.ifoodPrice > 0
+                                                                    ? 'iFood: R\$ ${product.ifoodPrice.toStringAsFixed(2)}'
+                                                                    : '+ Preço iFood',
+                                                                style: TextStyle(
+                                                                  fontSize: 10,
+                                                                  fontWeight: FontWeight.bold,
+                                                                  color: product.ifoodPrice > 0 ? const Color(0xFFEA1D2C) : Colors.grey[700],
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+
+                                                      // Badge Lucro
+                                                      Builder(
+                                                        builder: (context) {
+                                                          final totalVal = product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice;
+                                                          final profit = totalVal - product.totalCost;
+                                                          final profitPerUnit = product.yieldAmount > 0 ? profit / product.yieldAmount : 0.0;
+                                                          final isPositive = profit >= 0;
+
+                                                          return Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                            decoration: BoxDecoration(
+                                                              color: isPositive ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                                                              borderRadius: BorderRadius.circular(12),
+                                                              border: Border.all(
+                                                                color: isPositive ? const Color(0xFFA5D6A7) : const Color(0xFFEF9A9A),
+                                                                width: 1,
+                                                              ),
+                                                            ),
+                                                            child: Text(
+                                                              product.yieldAmount > 1 
+                                                                  ? 'Lucro: R\$ ${profitPerUnit.toStringAsFixed(2)} / ${product.unit}'
+                                                                  : 'Lucro: R\$ ${profit.toStringAsFixed(2)}',
+                                                              style: TextStyle(
+                                                                color: isPositive ? const Color(0xFF2E7D32) : const Color(0xFFC62828), 
+                                                                fontSize: 10, 
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          );
+                                                        },
+                                                      ),
+                                                    ],
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                          // Botão de deletar
-                                          Positioned(
-                                            top: 12, right: 12,
-                                            child: CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: Colors.white,
-                                              child: IconButton(
-                                                padding: EdgeInsets.zero,
-                                                icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                                                onPressed: () async {
-                                                  await DatabaseHelper.instance.deleteProduct(product.id!);
-                                                  _refreshProducts();
-                                                },
-                                              ),
-                                            ),
-                                          ),
-                                          // Botão WhatsApp Share
-                                          Positioned(
-                                            top: 12, right: 52,
-                                            child: CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: Colors.white,
-                                              child: IconButton(
-                                                padding: EdgeInsets.zero,
-                                                icon: const Icon(Icons.share, size: 16, color: Colors.green),
-                                                onPressed: () async {
-                                                  final total = product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice;
-                                                  final fraction = product.yieldAmount > 1 ? (total / product.yieldAmount).toStringAsFixed(2) : '';
-                                                  
-                                                  String msg = 'Olá! Segue o detalhe do nosso produto:\n\n';
-                                                  msg += '🎂 *${product.name}*\n';
-                                                  if (product.yieldAmount > 1) {
-                                                    msg += '📦 Rende: ${product.yieldAmount.toInt()} ${product.unit}(s)\n';
-                                                    msg += '💰 Valor Total (Loja): R\$ ${total.toStringAsFixed(2)}\n';
-                                                    msg += '💵 Valor / ${product.unit}: R\$ $fraction\n';
-                                                  } else {
-                                                    msg += '💰 Valor (Loja): R\$ ${total.toStringAsFixed(2)} / ${product.unit}\n';
-                                                  }
-                                                  if (product.ifoodPrice > 0) {
-                                                    msg += '🛵 Valor no iFood: R\$ ${product.ifoodPrice.toStringAsFixed(2)}\n';
-                                                  }
-                                                  msg += '\nGostaria de fazer uma encomenda?';
-                                                  
-                                                  final url = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(msg)}');
-                                                  if (await canLaunchUrl(url)) {
-                                                    await launchUrl(url);
-                                                  }
-                                                },
-                                              ),
-                                            ),
-                                          ),
-                                          // Botão iFood Preço Rápido
-                                          Positioned(
-                                            top: 12, right: 92,
-                                            child: CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: product.ifoodPrice > 0 ? const Color(0xFFEA1D2C) : Colors.white,
-                                              child: IconButton(
-                                                padding: EdgeInsets.zero,
-                                                tooltip: 'Preço no iFood',
-                                                icon: Icon(
-                                                  Icons.delivery_dining,
-                                                  size: 16,
-                                                  color: product.ifoodPrice > 0 ? Colors.white : const Color(0xFFEA1D2C),
-                                                ),
-                                                onPressed: () => _showIfoodPriceDialog(product),
-                                              ),
-                                            ),
-                                          ),
-
-                                          // Título e Preço
-                                          Positioned(
-                                            bottom: 16, left: 16, right: 16,
-                                            child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              crossAxisAlignment: CrossAxisAlignment.end,
-                                              children: [
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Text(
-                                                        product.name,
-                                                        style: GoogleFonts.merriweather(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                                                        maxLines: 2,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                      if (product.yieldAmount > 1)
-                                                        Text(
-                                                          'Rende ${product.yieldAmount.toInt()} ${product.unit}(s)',
-                                                          style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Text(
-                                                      'R\$ ${product.sellPrice > 0 ? product.sellPrice.toStringAsFixed(2) : product.suggestedPrice.toStringAsFixed(2)}',
-                                                      style: GoogleFonts.merriweather(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                                    ),
-                                                    if (product.yieldAmount > 1)
-                                                      Text(
-                                                        'R\$ ${((product.sellPrice > 0 ? product.sellPrice : product.suggestedPrice) / product.yieldAmount).toStringAsFixed(2)} / ${product.unit}',
-                                                        style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 12, fontWeight: FontWeight.bold),
-                                                      ),
-                                                    if (product.yieldAmount <= 1)
-                                                      Text(
-                                                        '/ ${product.unit}',
-                                                        style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                                      ),
-                                                    if (product.ifoodPrice > 0)
-                                                      Padding(
-                                                        padding: const EdgeInsets.only(top: 2),
-                                                        child: Text(
-                                                          'iFood: R\$ ${product.ifoodPrice.toStringAsFixed(2)}',
-                                                          style: const TextStyle(
-                                                            color: Color(0xFFFF8A80),
-                                                            fontSize: 11,
-                                                            fontWeight: FontWeight.bold,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ), // Stack
-                                    ), // ClipRRect
-                                  ), // Container
-                                ); // InkWell
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
                                 }).toList(),
                               ],
                             );
@@ -453,14 +444,21 @@ class _CatalogScreenState extends State<CatalogScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            // Sugestão com base na taxa real de 26,2% apurada no relatório (23% comissão + 3,2% app)
-            // Preço iFood = Preço Loja / 0.738 para cobrir exatamente os 26,2%
-            final suggestedIfood = basePrice > 0 ? (basePrice / 0.738) : 0.0;
+            final isSlice = product.yieldAmount > 1;
+            final unitBasePrice = isSlice ? (basePrice / product.yieldAmount) : basePrice;
+            final unitBaseCost = isSlice ? (product.totalCost / product.yieldAmount) : product.totalCost;
+            final kitCost = isSlice ? 2.40 : 0.60;
+            final totalUnitCost = unitBaseCost + kitCost;
+
+            // Sugestão com 100% de lucro líquido (ou margem configurada) cobrindo os 26.2% do iFood
+            final marginMultiplier = 1 + (product.profitMarginPercent / 100);
+            final suggestedIfood = (totalUnitCost * marginMultiplier) / 0.738;
             
             final retention262 = currentInputPrice * 0.262;
             final netPayout = currentInputPrice * 0.738;
-            final netProfit = netPayout - product.totalCost;
+            final netProfit = netPayout - totalUnitCost;
             final isProfitPositive = netProfit >= 0;
+            final profitPercent = totalUnitCost > 0 ? (netProfit / totalUnitCost) * 100 : 0.0;
 
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -513,9 +511,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Preço Balcão (Loja):', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text(isSlice ? 'Preço Balcão (${product.unit}):' : 'Preço Balcão (Loja):', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                               Text(
-                                'R\$ ${basePrice.toStringAsFixed(2)}',
+                                'R\$ ${unitBasePrice.toStringAsFixed(2)}',
                                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                               ),
                             ],
@@ -523,9 +521,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text('Custo Produção:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text(isSlice ? 'Custo Fatia + Kit iFood:' : 'Custo Produção:', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                               Text(
-                                'R\$ ${product.totalCost.toStringAsFixed(2)}',
+                                'R\$ ${totalUnitCost.toStringAsFixed(2)}',
                                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.blueGrey),
                               ),
                             ],
@@ -536,37 +534,35 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     const SizedBox(height: 12),
 
                     // Botão de sugestão automática
-                    if (basePrice > 0) ...[
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFEA1D2C),
-                          side: const BorderSide(color: Color(0xFFEA1D2C)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                        icon: const Icon(Icons.auto_awesome, size: 16),
-                        label: Text('Sugerir R\$ ${suggestedIfood.toStringAsFixed(2)} (+26,2% iFood)'),
-                        onPressed: () {
-                          setDialogState(() {
-                            currentInputPrice = suggestedIfood;
-                            controller.text = suggestedIfood.toStringAsFixed(2);
-                          });
-                        },
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFEA1D2C),
+                        side: const BorderSide(color: Color(0xFFEA1D2C)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      const SizedBox(height: 12),
-                    ],
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: Text('Sugerir R\$ ${suggestedIfood.toStringAsFixed(2)} (${product.profitMarginPercent.toStringAsFixed(0)}% Lucro iFood)'),
+                      onPressed: () {
+                        setDialogState(() {
+                          currentInputPrice = suggestedIfood;
+                          controller.text = suggestedIfood.toStringAsFixed(2);
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
 
                     // Campo de Preço iFood
                     TextField(
                       controller: controller,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Preço Praticado no iFood (R\$)',
-                        hintText: 'Ex: 68.50',
+                      decoration: InputDecoration(
+                        labelText: isSlice ? 'Preço por ${product.unit} no iFood (R\$)' : 'Preço Praticado no iFood (R\$)',
+                        hintText: isSlice ? 'Ex: 20.99' : 'Ex: 68.50',
                         prefixText: 'R\$ ',
-                        border: OutlineInputBorder(),
-                        focusedBorder: OutlineInputBorder(
+                        border: const OutlineInputBorder(),
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: Color(0xFFEA1D2C), width: 2),
                         ),
                       ),
@@ -599,10 +595,20 @@ class _CatalogScreenState extends State<CatalogScreen> {
                               ),
                             ),
                             const SizedBox(height: 6),
+                            if (isSlice) ...[
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Custo Fatia + Kit iFood (R\$ 2,40):', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                  Text('- R\$ ${totalUnitCost.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                            ],
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Retenção iFood (26,2%):', style: TextStyle(fontSize: 12)),
+                                const Text('Retenção iFood (26,2%):', style: TextStyle(fontSize: 12, color: Colors.grey)),
                                 Text('- R\$ ${retention262.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600)),
                               ],
                             ),
@@ -611,14 +617,23 @@ class _CatalogScreenState extends State<CatalogScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('Repasse Líquido iFood (73,8%):', style: TextStyle(fontSize: 12)),
-                                Text('R\$ ${netPayout.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                Text('R\$ ${netPayout.toStringAsFixed(2)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blue)),
                               ],
                             ),
                             const Divider(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('Lucro Líquido Real:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Lucro Líquido Real:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                    Text(
+                                      '${profitPercent >= 0 ? "+" : ""}${profitPercent.toStringAsFixed(1)}% sobre o custo',
+                                      style: TextStyle(fontSize: 10, color: isProfitPositive ? Colors.green[700] : Colors.red[700], fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
                                 Text(
                                   'R\$ ${netProfit.toStringAsFixed(2)}',
                                   style: TextStyle(
