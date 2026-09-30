@@ -108,6 +108,9 @@ function switchView(viewId) {
     products: { title: 'Catálogo de Produtos & Estoque Pronto', subtitle: 'Composição de receitas, insumos extras, precificação inteligente e estoque' },
     'quick-stock': { title: 'Estoque Rápido (+ / -)', subtitle: 'Painel visual de 2 colunas com botões rápidos de controle de estoque' },
     sales: { title: 'Registro de Vendas', subtitle: 'Lançamento de vendas com baixa automática de estoque e cálculo de lucro' },
+    'ponto-command': { title: 'PONTO OS — Central de Comando', subtitle: 'Visão executiva integrada entre os 9 Agentes Especialistas da Doce & Ponto' },
+    'ponto-approvals': { title: 'PONTO OS — Central de Aprovações', subtitle: 'Governança humana e autorização de ações propostas pelos agentes de IA' },
+    'ponto-chat': { title: 'PONTO OS — Chat com PONTO MASTER', subtitle: 'Converse com o orquestrador geral inteligente da Doce & Ponto' },
   };
 
   const meta = titles[viewId] || titles.dashboard;
@@ -121,6 +124,10 @@ function switchView(viewId) {
     renderProductsTable(productsList);
   } else if (viewId === 'quick-stock') {
     renderQuickStock(productsList);
+  } else if (viewId === 'ponto-command') {
+    window.pontoOS?.refreshCommandCenter();
+  } else if (viewId === 'ponto-approvals') {
+    window.pontoOS?.refreshApprovals();
   }
 }
 
@@ -164,6 +171,18 @@ async function loadAllData() {
     updateStockAlerts();
     populateProductSelects();
 
+    // Inicialização do PONTO OS (Inteligência dos Agentes)
+    if (window.initPontoOS) {
+      window.initPontoOS(supabaseClient).then(() => {
+        supabaseClient.from('agent_actions').select('id', { count: 'exact' }).eq('status', 'pending').then(({ count }) => {
+          const navBadge = document.getElementById('navApprovalBadge');
+          if (navBadge) {
+            navBadge.textContent = count || 0;
+            navBadge.style.display = (count && count > 0) ? 'inline-block' : 'none';
+          }
+        });
+      });
+    }
   } catch (error) {
     console.error('Erro ao carregar dados do Supabase:', error);
     showToast('Erro ao carregar dados do servidor.', 'error');
@@ -1321,6 +1340,7 @@ async function deleteProduct(prodId, prodName) {
 // ==========================================================================
 const PRODUCT_THEMES = [
   { keywords: ['chocolate', 'cacau', 'choc'], bg: '#fdf7f2', border: '#854d0e', text: '#78350f', badgeBg: '#fef3c7', badgeText: '#92400e', icon: '🍫' },
+  { keywords: ['purple velvet', 'roxo', 'violeta'], bg: '#faf5ff', border: '#9333ea', text: '#6b21a8', badgeBg: '#f3e8ff', badgeText: '#7e22ce', icon: '💜' },
   { keywords: ['red velvet', 'velvet', 'vermelho'], bg: '#fdf2f2', border: '#dc2626', text: '#991b1b', badgeBg: '#fee2e2', badgeText: '#b91c1c', icon: '🌹' },
   { keywords: ['maracuja', 'maracujá', 'tropical'], bg: '#fefce8', border: '#d97706', text: '#854d0e', badgeBg: '#fef08a', badgeText: '#854d0e', icon: '🟡' },
   { keywords: ['cenoura', 'brigadeiro'], bg: '#fff7ed', border: '#ea580c', text: '#9a3412', badgeBg: '#ffedd5', badgeText: '#c2410c', icon: '🥕' },
