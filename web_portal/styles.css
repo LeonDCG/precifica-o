@@ -1263,6 +1263,90 @@ body {
 }
 
 /* ==========================================================================
+   9.1 MÓDULO: CONTROLE DIRETO DE BOLOS (SEM RECEITA/FICHA)
+   ========================================================================== */
+.simple-cake-row {
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.simple-cake-row .quick-col-product {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.simple-cake-info-block {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 260px;
+}
+
+.simple-cake-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.simple-cake-actions .btn-cake-action {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  color: var(--text-main);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.simple-cake-actions .btn-cake-action:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.simple-cake-actions .btn-cake-action.delete {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+
+.simple-cake-actions .btn-cake-action.delete:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.btn-goto-simple-cakes {
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(236, 72, 153, 0.35) !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+}
+
+.btn-goto-simple-cakes:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(236, 72, 153, 0.45) !important;
+}
+
+/* ==========================================================================
    10. UPLOAD DE FOTOS E IMAGENS DE PRODUTOS & AVATARES
    ========================================================================== */
 .product-image-upload-wrap {

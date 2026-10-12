@@ -65,6 +65,11 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><rect x="3" y="3" width="18" height="18" rx="4"/></svg>
           <span>Estoque Rápido (+ / -)</span>
         </button>
+        <button class="nav-item" data-view="simple-cakes" style="border-left: 3px solid #ec4899;">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s2-1 4-1 4 1 4 1 2-1 4-1 4 1 4 1"/><path d="M2 21h20"/><path d="M7 8v3"/><path d="M12 8v3"/><path d="M17 8v3"/><path d="M7 4h.01"/><path d="M12 4h.01"/><path d="M17 4h.01"/></svg>
+          <span>Controle Direto de Bolos</span>
+          <span class="badge-counter" id="simpleCakesBadge" style="display: none; background: #ec4899; color: #fff;">0</span>
+        </button>
         <button class="nav-item" data-view="sales">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
           <span>Registro de Vendas</span>
@@ -443,6 +448,10 @@
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
               <span>Sincronizar</span>
             </button>
+            <button class="btn btn-goto-simple-cakes" onclick="switchView('simple-cakes')" title="Abrir controle direto de bolos sem receita ou ficha técnica">
+              <span style="font-size: 18px;">🎂</span>
+              <span>Controle Direto de Bolos (Sem Ficha)</span>
+            </button>
           </div>
         </div>
 
@@ -458,6 +467,65 @@
           </div>
           <div id="quickStockList" class="quick-stock-list">
             <div class="text-center py-8 text-muted">Carregando painel de estoque rápido...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: CONTROLE DIRETO DE BOLOS (SEM RECEITAS/FICHAS - 2 COLUNAS DIRETO) -->
+      <section id="view-simple-cakes" class="content-view">
+        <!-- BARRA SUPERIOR DO CONTROLE DIRETO DE BOLOS -->
+        <div class="quick-stock-top-bar simple-cakes-top-bar">
+          <div class="search-box quick-stock-search">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="simpleCakeSearchInput" class="input-search" placeholder="Buscar bolo por nome ou sabor..." oninput="filterSimpleCakes()">
+          </div>
+          <div class="quick-stock-stats">
+            <div class="quick-stat-badge stat-total" style="background: #fdf2f8; border-color: #fbcfe8; color: #9d174d;">
+              <span class="stat-label">Total de Bolos:</span>
+              <span class="stat-val" id="simpleCakesTotalUnits">0 un</span>
+            </div>
+            <div class="quick-stat-badge" style="background: #eff6ff; border-color: #bfdbfe; color: #1e40af;">
+              <span class="stat-label">Tipos Cadastrados:</span>
+              <span class="stat-val" id="simpleCakesTotalTypes">0 tipos</span>
+            </div>
+            <div class="quick-stat-badge stat-alert">
+              <span class="stat-label">Zerados / Esgotados:</span>
+              <span class="stat-val" id="simpleCakesZeroCount">0 bolos</span>
+            </div>
+            <button class="btn btn-primary" onclick="openSimpleCakeModal()" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); border: none; font-weight: 700; box-shadow: 0 4px 14px rgba(236, 72, 153, 0.3); display: flex; align-items: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>+ Novo Bolo</span>
+            </button>
+            <button class="btn btn-secondary" onclick="switchView('quick-stock')" title="Voltar ao Estoque Rápido Geral">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+              <span>Estoque Geral</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- AVISO DE USO RÁPIDO & PRATICIDADE -->
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 12px; color: #92400e; font-size: 14px; font-weight: 500;">
+            <span style="font-size: 24px;">⚡</span>
+            <span><strong>Módulo Exclusivo Direto (Sem Ficha Técnica):</strong> Cadastre qualquer bolo na hora pelo nome, sem precisar de receitas ou ingredientes vinculados. Controle a quantidade no balcão rapidamente pelos botões <strong>+</strong> e <strong>-</strong>.</span>
+          </div>
+          <button class="btn btn-sm btn-primary" onclick="openSimpleCakeModal()" style="white-space: nowrap; background: #ec4899; border: none; font-weight: 700;">
+            + Cadastrar Bolo Agora
+          </button>
+        </div>
+
+        <!-- CONTAINER DE 2 COLUNAS: BOLO & QUANTIDADE -->
+        <div class="quick-stock-container">
+          <div class="quick-stock-header-row" style="background: linear-gradient(90deg, #1e1b4b 0%, #0f172a 100%);">
+            <div class="col-head col-product">
+              <span>BOLO / SABOR / IDENTIFICAÇÃO</span>
+            </div>
+            <div class="col-head col-quantity">
+              <span>QUANTIDADE EM BALCÃO (+ / -)</span>
+            </div>
+          </div>
+          <div id="simpleCakesList" class="quick-stock-list">
+            <div class="text-center py-8 text-muted">Carregando painel de bolos...</div>
           </div>
         </div>
       </section>
@@ -975,6 +1043,65 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('movementsModal')">Fechar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONTROLE DIRETO DE BOLO (SEM FICHA / SEM RECEITA) -->
+  <div id="simpleCakeModal" class="modal">
+    <div class="modal-dialog" style="max-width: 520px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #fdf2f8 0%, #ffffff 100%); border-bottom: 1px solid #fce7f3;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 26px;">🎂</span>
+          <h3 id="simpleCakeModalTitle" style="color: #831843; font-weight: 800;">Cadastrar Bolo (Controle Rápido)</h3>
+        </div>
+        <button class="close-btn" onclick="closeModal('simpleCakeModal')">&times;</button>
+      </div>
+      <form id="simpleCakeForm" onsubmit="saveSimpleCake(event)">
+        <input type="hidden" id="simpleCakeId">
+        <div class="modal-body" style="padding: 24px;">
+          
+          <div class="form-group" style="margin-bottom: 18px;">
+            <label class="form-label" style="font-weight: 700; color: #1e293b;">Nome do Bolo *</label>
+            <input type="text" id="simpleCakeName" class="form-input" placeholder="Ex: Bolo de Cenoura com Brigadeiro" required autofocus style="font-size: 16px; padding: 12px 14px;">
+            <div class="form-helper-text">Não precisa de ficha ou receita. Apenas o nome do bolo que vai pro balcão.</div>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 18px;">
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 700; color: #1e293b;">Quantidade Atual / Inicial *</label>
+              <input type="number" step="1" min="0" id="simpleCakeQty" class="form-input" placeholder="0" value="1" required style="font-size: 18px; font-weight: 700; text-align: center;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 700; color: #1e293b;">Categoria / Tipo</label>
+              <input type="text" id="simpleCakeCategory" class="form-input" placeholder="Ex: Bolo Caseiro" list="simpleCakeCategoriesList" value="Bolo Caseiro">
+              <datalist id="simpleCakeCategoriesList">
+                <option value="Bolo Caseiro">
+                <option value="Bolo Recheado">
+                <option value="Bolo de Festa">
+                <option value="Fatia / Slice Cake">
+                <option value="Bolo Vulcão">
+                <option value="Bolo de Pote">
+                <option value="Torta Doce">
+              </datalist>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 10px;">
+            <label class="form-label" style="font-weight: 700; color: #1e293b;">Observação / Sabor / Tamanho (Opcional)</label>
+            <input type="text" id="simpleCakeNotes" class="form-input" placeholder="Ex: Forma 20cm, com cobertura, sem glúten...">
+          </div>
+
+          <div style="background: #fdf2f8; border: 1px solid #fce7f3; border-radius: 8px; padding: 12px 14px; margin-top: 14px; font-size: 13px; color: #9d174d; display: flex; align-items: center; gap: 8px;">
+            <span>💡</span>
+            <span>Este controle é 100% independente do estoque geral e receitas. Você pode alterar as quantidades rapidamente pelos botões <strong>+</strong> e <strong>-</strong>.</span>
+          </div>
+
+        </div>
+        <div class="modal-footer" style="background: #f8fafc; padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('simpleCakeModal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); border: none; font-weight: 700; padding: 10px 22px;">Salvar Bolo</button>
+        </div>
+      </form>
     </div>
   </div>
 

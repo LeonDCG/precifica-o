@@ -700,10 +700,16 @@ class _RecipesScreenState extends State<RecipesScreen> {
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
                   ),
                   Text('•', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  // Custo dos Insumos
+                  Text(
+                    'Insumos: R\$ ${recipe.ingredientsCost.toStringAsFixed(2)}',
+                    style: TextStyle(fontSize: 12, color: Colors.amber.shade300, fontWeight: FontWeight.w500),
+                  ),
+                  Text('•', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   // Custo total
                   Text(
-                    'Custo: R\$ ${recipe.totalCost.toStringAsFixed(2)}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                    'Total: R\$ ${recipe.totalCost.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                   Text('•', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   // Custo unitário em destaque verde

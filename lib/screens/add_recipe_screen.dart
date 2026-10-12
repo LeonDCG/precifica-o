@@ -22,6 +22,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
   String _yieldUnit = 'Unidade';
   String _instructions = '';
   int _prepTimeMinutes = 0;
+  double _additionalCostPercent = 10.0;
   double _hourlyRate = 0.0;
   List<String> _existingCategories = ['Geral'];
 
@@ -38,6 +39,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
       _yieldUnit = widget.recipe!.yieldUnit;
       _instructions = widget.recipe!.instructions;
       _prepTimeMinutes = widget.recipe!.prepTimeMinutes;
+      _additionalCostPercent = widget.recipe!.additionalCostPercent;
       _selectedIngredients.addAll(widget.recipe!.ingredients);
     }
     _loadIngredients();
@@ -199,6 +201,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
         category: _category,
         yieldAmount: _yieldAmount,
         yieldUnit: _yieldUnit,
+        additionalCostPercent: _additionalCostPercent,
         instructions: _instructions,
         prepTimeMinutes: _prepTimeMinutes,
         laborCost: (_prepTimeMinutes / 60.0) * _hourlyRate,
@@ -213,11 +216,24 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
     }
   }
 
-  double get _currentTotalCost {
+  double get _currentIngredientsCost {
     double sum = 0;
     for (var ri in _selectedIngredients) sum += ri.cost;
-    sum += (_prepTimeMinutes / 60.0) * _hourlyRate;
     return sum;
+  }
+
+  double get _currentLaborCost => (_prepTimeMinutes / 60.0) * _hourlyRate;
+
+  double get _currentTotalCost {
+    final base = _currentIngredientsCost + _currentLaborCost;
+    return base * (1 + (_additionalCostPercent / 100));
+  }
+
+  String _formatCost(double cost) {
+    if (cost > 0 && cost < 0.01) {
+      return 'R\$ ${cost.toStringAsFixed(4)}';
+    }
+    return 'R\$ ${cost.toStringAsFixed(2)}';
   }
 
   @override
@@ -305,15 +321,39 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('CUSTO TOTAL / RENDIMENTO', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 10, letterSpacing: 1)),
-                      if (_prepTimeMinutes > 0)
+                      if (_currentLaborCost > 0)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
-                          child: Text('+ Mão de obra (R\$ ${((_prepTimeMinutes / 60.0) * _hourlyRate).toStringAsFixed(2)})', style: const TextStyle(color: Colors.white, fontSize: 8)),
+                          child: Text('+ Mão de obra (R\$ ${_currentLaborCost.toStringAsFixed(2)})', style: const TextStyle(color: Colors.white, fontSize: 8)),
                         ),
                     ],
                   ),
                   Text('R\$ ${_currentTotalCost.toStringAsFixed(2)}', style: GoogleFonts.merriweather(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'Insumos: R\$ ${_currentIngredientsCost.toStringAsFixed(2)}',
+                        style: TextStyle(color: Colors.amber.shade200, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                      if (_additionalCostPercent > 0) ...[
+                        Text('•', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+                        Text(
+                          '+ Extras (${_additionalCostPercent.toInt()}%): R\$ ${(_currentTotalCost - (_currentIngredientsCost + _currentLaborCost)).toStringAsFixed(2)}',
+                          style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11),
+                        ),
+                      ],
+                      Text('•', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+                      Text(
+                        'Unitário: R\$ ${(_yieldAmount > 0 ? _currentTotalCost / _yieldAmount : _currentTotalCost).toStringAsFixed(2)} / $_yieldUnit',
+                        style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -333,6 +373,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                               ),
                               keyboardType: TextInputType.number,
+                              onChanged: (v) => setState(() => _yieldAmount = double.tryParse(v.replaceAll(',', '.')) ?? 1),
                               onSaved: (v) => _yieldAmount = double.tryParse(v!.replaceAll(',', '.')) ?? 1,
                             ),
                           ],
@@ -439,6 +480,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
 
   Widget _buildSection({required String title, required String type, required String emptyText, IconData? icon}) {
     final list = _selectedIngredients.where((i) => i.ingredientType == type).toList();
+    final sectionSubtotal = list.fold<double>(0.0, (acc, item) => acc + item.cost);
     
     return Container(
       decoration: BoxDecoration(
@@ -462,7 +504,25 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                   child: Row(
                     children: [
                       if (icon != null) ...[Icon(icon, size: 18, color: Colors.brown), const SizedBox(width: 6)],
-                      Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            text: title,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                            children: [
+                              if (list.isNotEmpty)
+                                TextSpan(
+                                  text: ' (R\$ ${sectionSubtotal.toStringAsFixed(2)})',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.amber.shade400,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -493,6 +553,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final ri = list[index];
+                final qtyStr = ri.quantityUsed.toStringAsFixed(ri.quantityUsed.truncateToDouble() == ri.quantityUsed ? 0 : 2);
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                   child: Row(
@@ -509,7 +570,7 @@ class _AddRecipeScreenState extends State<AddRecipeScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${ri.quantityUsed} ${ri.ingredientUnit}  •  R\$ ${ri.cost.toStringAsFixed(2)}', 
+                              '$qtyStr ${ri.ingredientUnit}  •  ${_formatCost(ri.cost)}', 
                               style: const TextStyle(fontSize: 12, color: Colors.grey),
                             ),
                           ],

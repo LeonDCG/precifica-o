@@ -191,7 +191,7 @@ class DatabaseHelper {
   Future<List<Recipe>> _fetchRecipes() async {
     final results = await Future.wait([
       _client.from('recipes').select().order('name', ascending: true),
-      _client.from('ingredients').select('id, name, unit'),
+      _client.from('ingredients').select('id, name, unit, price, quantity'),
       _client.from('recipe_ingredients').select(),
     ]);
 
@@ -201,11 +201,15 @@ class DatabaseHelper {
 
     final ingredientNameMap = <int, String>{};
     final ingredientUnitMap = <int, String>{};
+    final ingredientPriceMap = <int, double>{};
+    final ingredientQtyMap = <int, double>{};
     for (var json in allIngredientsRaw) {
       if (json['id'] != null) {
         final id = json['id'] as int;
         ingredientNameMap[id] = json['name']?.toString() ?? '';
         ingredientUnitMap[id] = json['unit']?.toString() ?? '';
+        ingredientPriceMap[id] = ((json['price'] ?? 0.0) as num).toDouble();
+        ingredientQtyMap[id] = ((json['quantity'] ?? 1.0) as num).toDouble();
       }
     }
 
@@ -215,6 +219,14 @@ class DatabaseHelper {
       if (ri.recipeId != 0) {
         ri.ingredientName = ingredientNameMap[ri.ingredientId] ?? '';
         ri.ingredientUnit = ingredientUnitMap[ri.ingredientId] ?? '';
+
+        // Recalcula dinamicamente com base no preço atual do insumo, caso disponível
+        final ingPrice = ingredientPriceMap[ri.ingredientId];
+        final ingQty = ingredientQtyMap[ri.ingredientId];
+        if (ingPrice != null && ingQty != null && ingQty > 0) {
+          ri.cost = (ingPrice / ingQty) * ri.quantityUsed;
+        }
+
         recipeIngredientsByRecipeId.putIfAbsent(ri.recipeId, () => []).add(ri);
       }
     }

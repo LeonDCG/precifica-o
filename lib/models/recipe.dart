@@ -24,15 +24,37 @@ class Recipe {
     this.ingredients = const [],
   });
 
-  double get totalCost {
-    double sum = laborCost;
+  /// Soma exclusivamente o custo dos ingredientes/insumos da receita
+  double get ingredientsCost {
+    double sum = 0.0;
     for (var i in ingredients) {
       sum += i.cost;
     }
-    return sum * (1 + (additionalCostPercent / 100));
+    return sum;
   }
 
-  double get costPerYield => totalCost / yieldAmount;
+  /// Custo total considerando insumos, mão de obra real e custos adicionais (gás/energia)
+  double get totalCost {
+    final ingCost = ingredientsCost;
+    double labor = laborCost;
+
+    // Se temos ingredientes e o laborCost no banco é praticamente idêntico ao custo dos ingredientes
+    // (decorrente do salvamento pelo portal web que gravava a soma dos insumos na coluna laborcost),
+    // ignoramos esse laborCost duplicado.
+    if (ingCost > 0 && (labor - ingCost).abs() < 0.05) {
+      labor = 0.0;
+    }
+
+    double baseSum = ingCost + labor;
+    // Se não há ingredientes carregados na memória, usa o laborCost como custo base de fallback
+    if (baseSum == 0.0 && laborCost > 0) {
+      baseSum = laborCost;
+    }
+
+    return baseSum * (1 + (additionalCostPercent / 100));
+  }
+
+  double get costPerYield => yieldAmount > 0 ? totalCost / yieldAmount : totalCost;
 
   Map<String, dynamic> toMap() {
     return {

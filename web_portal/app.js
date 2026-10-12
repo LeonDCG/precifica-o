@@ -13,6 +13,7 @@ let productExpensesList = [];
 let productsList = [];
 let salesList = [];
 let movementsList = [];
+let simpleCakesList = [];
 
 // MODOS E AGRUPAMENTOS
 let collapsedRecipeGroups = new Set();
@@ -107,6 +108,7 @@ function switchView(viewId) {
     recipes: { title: 'Cadastro de Receitas', subtitle: 'Fichas técnicas com cálculo dinâmico de custo e rendimento' },
     products: { title: 'Catálogo de Produtos & Estoque Pronto', subtitle: 'Composição de receitas, insumos extras, precificação inteligente e estoque' },
     'quick-stock': { title: 'Estoque Rápido (+ / -)', subtitle: 'Painel visual de 2 colunas com botões rápidos de controle de estoque' },
+    'simple-cakes': { title: 'Controle Direto de Bolos (Sem Ficha Técnica)', subtitle: 'Controle ágil e independente de bolos prontos para o balcão com botões rápidos (+ / -)' },
     sales: { title: 'Registro de Vendas', subtitle: 'Lançamento de vendas com baixa automática de estoque e cálculo de lucro' },
     'ponto-command': { title: 'PONTO OS — Central de Comando', subtitle: 'Visão executiva integrada entre os 9 Agentes Especialistas da Doce & Ponto' },
     'ponto-approvals': { title: 'PONTO OS — Central de Aprovações', subtitle: 'Governança humana e autorização de ações propostas pelos agentes de IA' },
@@ -124,6 +126,8 @@ function switchView(viewId) {
     renderProductsTable(productsList);
   } else if (viewId === 'quick-stock') {
     renderQuickStock(productsList);
+  } else if (viewId === 'simple-cakes') {
+    renderSimpleCakes(simpleCakesList);
   } else if (viewId === 'ponto-command') {
     window.pontoOS?.refreshCommandCenter();
   } else if (viewId === 'ponto-approvals') {
@@ -170,6 +174,7 @@ async function loadAllData() {
     renderSalesTable(salesList);
     updateStockAlerts();
     populateProductSelects();
+    loadSimpleCakes();
 
     // Inicialização do PONTO OS (Inteligência dos Agentes)
     if (window.initPontoOS) {
@@ -879,7 +884,7 @@ function calcRecipeTotalCost() {
     if (ing && ing.quantity > 0) {
       rowCost = (ing.price / ing.quantity) * qty;
     }
-    costSpan.textContent = formatBRL(rowCost);
+    costSpan.textContent = (rowCost > 0 && rowCost < 0.01) ? ('R$ ' + rowCost.toFixed(4).replace('.', ',')) : formatBRL(rowCost);
     total += rowCost;
   });
 
@@ -896,7 +901,7 @@ async function saveRecipe(e) {
   const name = document.getElementById('recipeName').value.trim();
   const yieldAmount = parseFloat(document.getElementById('recipeYieldAmount').value) || 1;
 
-  // Calcular custo total
+  // Calcular custo total dos ingredientes
   const rows = document.querySelectorAll('.recipe-ingredient-row');
   let totalCost = 0;
   const itemsToSave = [];
@@ -914,12 +919,15 @@ async function saveRecipe(e) {
 
   try {
     if (id) {
-      // 1. Atualiza dados principais da receita existente
+      // 1. Atualiza dados principais da receita existente sem corromper laborcost com o custo dos insumos
+      const existingRec = recipesList.find(r => r.id == id);
+      const preservedLabor = (existingRec && Math.abs((Number(existingRec.laborcost) || 0) - totalCost) > 0.05) ? Number(existingRec.laborcost) : 0;
+
       const { error: updateErr } = await supabaseClient.from('recipes').update({
         name: name,
         yieldamount: yieldAmount,
         yieldunit: 'unidade',
-        laborcost: totalCost,
+        laborcost: preservedLabor,
       }).eq('id', id);
 
       if (updateErr) throw updateErr;
@@ -935,12 +943,12 @@ async function saveRecipe(e) {
 
       showToast(`Receita "${name}" atualizada com sucesso!`, 'success');
     } else {
-      // 1. Cadastra nova receita
+      // 1. Cadastra nova receita (laborcost inicial 0 se não configurado)
       const { data: recipeData, error: recipeErr } = await supabaseClient.from('recipes').insert([{
         name: name,
         yieldamount: yieldAmount,
         yieldunit: 'unidade',
-        laborcost: totalCost,
+        laborcost: 0,
       }]).select();
 
       if (recipeErr) throw recipeErr;
@@ -1542,6 +1550,417 @@ async function adjustQuickStock(prodId, delta) {
   }
 }
 
+// ==========================================================================
+// MÓDULO EXCLUSIVO: CONTROLE DIRETO DE BOLOS (SEM RECEITAS OU FICHAS)
+// ==========================================================================
+
+const CAKE_THEMES = [
+  { bg: '#fdf2f8', border: '#ec4899', text: '#831843', badgeBg: '#fce7f3', badgeText: '#9d174d', icon: '🎂' }, // Morango / Red Velvet
+  { bg: '#fff7ed', border: '#ea580c', text: '#7c2d12', badgeBg: '#ffedd5', badgeText: '#9a3412', icon: '🍰' }, // Cenoura / Laranja
+  { bg: '#fefce8', border: '#ca8a04', text: '#713f12', badgeBg: '#fef08a', badgeText: '#854d0e', icon: '🧁' }, // Fubá / Milho
+  { bg: '#fef2f2', border: '#dc2626', text: '#7f1d1d', badgeBg: '#fee2e2', badgeText: '#991b1b', icon: '🍓' }, // Frutas Vermelhas
+  { bg: '#faf5ff', border: '#9333ea', text: '#581c87', badgeBg: '#f3e8ff', badgeText: '#6b21a8', icon: '🫐' }, // Mirtilo / Uva
+  { bg: '#f0fdf4', border: '#16a34a', text: '#14532d', badgeBg: '#dcfce7', badgeText: '#15803d', icon: '🍋' }, // Limão / Cítrico
+  { bg: '#eff6ff', border: '#2563eb', text: '#1e3a8a', badgeBg: '#dbeafe', badgeText: '#1e40af', icon: '🥞' }, // Ninho / Baunilha
+  { bg: '#fef7ee', border: '#78350f', text: '#451a03', badgeBg: '#fed7aa', badgeText: '#7c2d12', icon: '🍫' }, // Chocolate / Brigadeiro
+];
+
+function getCakeTheme(name, index) {
+  const norm = (name || '').toLowerCase();
+  if (norm.includes('choc') || norm.includes('brigadeir') || norm.includes('cacau')) {
+    return { bg: '#fef7ee', border: '#78350f', text: '#451a03', badgeBg: '#fed7aa', badgeText: '#7c2d12', icon: '🍫' };
+  }
+  if (norm.includes('cenour') || norm.includes('laranja')) {
+    return { bg: '#fff7ed', border: '#ea580c', text: '#7c2d12', badgeBg: '#ffedd5', badgeText: '#9a3412', icon: '🍰' };
+  }
+  if (norm.includes('fub') || norm.includes('milho')) {
+    return { bg: '#fefce8', border: '#ca8a04', text: '#713f12', badgeBg: '#fef08a', badgeText: '#854d0e', icon: '🧁' };
+  }
+  if (norm.includes('morang') || norm.includes('red velvet')) {
+    return { bg: '#fdf2f8', border: '#ec4899', text: '#831843', badgeBg: '#fce7f3', badgeText: '#9d174d', icon: '🍓' };
+  }
+  if (norm.includes('lim') || norm.includes('abacaxi')) {
+    return { bg: '#f0fdf4', border: '#16a34a', text: '#14532d', badgeBg: '#dcfce7', badgeText: '#15803d', icon: '🍋' };
+  }
+  let hash = 0;
+  for (let i = 0; i < norm.length; i++) hash = norm.charCodeAt(i) + ((hash << 5) - hash);
+  const idx = Math.abs(hash + index) % CAKE_THEMES.length;
+  return CAKE_THEMES[idx];
+}
+
+async function loadSimpleCakes() {
+  try {
+    // 1. Carregamento imediato do cache local
+    const cached = localStorage.getItem('simple_cakes_cache');
+    if (cached) {
+      try {
+        simpleCakesList = JSON.parse(cached);
+        updateSimpleCakesStats();
+        if (document.getElementById('view-simple-cakes')?.classList.contains('active')) {
+          renderSimpleCakes(simpleCakesList);
+        }
+      } catch (e) {
+        console.warn('Erro ao ler cache de bolos:', e);
+      }
+    }
+
+    // 2. Sincronização com Supabase (tabela simple_cakes)
+    const { data, error } = await supabaseClient
+      .from('simple_cakes')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (!error && data) {
+      simpleCakesList = data;
+      localStorage.setItem('simple_cakes_cache', JSON.stringify(simpleCakesList));
+      updateSimpleCakesStats();
+      if (document.getElementById('view-simple-cakes')?.classList.contains('active')) {
+        renderSimpleCakes(simpleCakesList);
+      }
+    }
+  } catch (err) {
+    console.warn('Conexão offline ou pendente para bolos simples:', err);
+  }
+}
+
+function updateSimpleCakesStats() {
+  const totalUnits = simpleCakesList.reduce((acc, c) => acc + (Number(c.quantity) || 0), 0);
+  const totalTypes = simpleCakesList.length;
+  const zeroCount = simpleCakesList.filter(c => (Number(c.quantity) || 0) <= 0).length;
+
+  const totalEl = document.getElementById('simpleCakesTotalUnits');
+  const typesEl = document.getElementById('simpleCakesTotalTypes');
+  const zeroEl = document.getElementById('simpleCakesZeroCount');
+  const badgeEl = document.getElementById('simpleCakesBadge');
+
+  if (totalEl) totalEl.textContent = `${totalUnits} un`;
+  if (typesEl) typesEl.textContent = `${totalTypes} tipos`;
+  if (zeroEl) zeroEl.textContent = `${zeroCount} zerados`;
+  if (badgeEl) {
+    badgeEl.textContent = totalUnits;
+    badgeEl.style.display = totalUnits > 0 ? 'inline-block' : 'none';
+  }
+}
+
+function renderSimpleCakes(list = simpleCakesList) {
+  const container = document.getElementById('simpleCakesList');
+  if (!container) return;
+
+  updateSimpleCakesStats();
+
+  if (!list || list.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-10 text-muted" style="font-size: 17px; padding: 48px 20px; background: #ffffff; border-radius: 12px; margin: 16px;">
+        <div style="font-size: 44px; margin-bottom: 12px;">🎂</div>
+        <div style="font-weight: 800; color: #1e293b; font-size: 20px; margin-bottom: 6px;">Nenhum bolo cadastrado no controle direto</div>
+        <div style="color: #64748b; margin-bottom: 22px; max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+          Cadastre seus bolos em segundos sem precisar de receitas ou ingredientes. Você poderá aumentar e diminuir as quantidades com 1 clique!
+        </div>
+        <button class="btn btn-primary" onclick="openSimpleCakeModal()" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); border: none; font-weight: 700; padding: 12px 26px; font-size: 15px; box-shadow: 0 4px 14px rgba(236, 72, 153, 0.35);">
+          + Cadastrar Primeiro Bolo
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map((cake, idx) => {
+    const theme = getCakeTheme(cake.name, idx);
+    const qty = Number(cake.quantity) || 0;
+    const cardStatusClass = qty === 0 ? 'status-danger' : 'status-normal';
+
+    let alertBadgeHtml = '';
+    if (qty === 0) {
+      alertBadgeHtml = `<span class="quick-status-badge badge-danger">⚠️ ESGOTADO / ZERADO</span>`;
+    } else {
+      alertBadgeHtml = `<span class="quick-status-badge badge-success">✓ DISPONÍVEL</span>`;
+    }
+
+    return `
+      <div class="quick-stock-row simple-cake-row ${cardStatusClass}" id="simple-cake-row-${cake.id}" style="border-left: 10px solid ${theme.border};">
+        <!-- COLUNA 1: BOLO -->
+        <div class="quick-col-product" style="background: linear-gradient(90deg, ${theme.bg} 0%, #ffffff 100%);">
+          <div class="simple-cake-info-block">
+            <div class="quick-prod-icon" style="background: ${theme.border}; color: #ffffff;">
+              ${theme.icon}
+            </div>
+            <div class="quick-prod-info" style="flex: 1;">
+              <div class="quick-prod-name" style="color: ${theme.text};">
+                ${escapeHtml(cake.name)}
+              </div>
+              <div class="quick-prod-details">
+                <span class="quick-detail-tag" style="background:${theme.badgeBg}; color:${theme.badgeText}; border: 1px solid ${theme.border}40;">
+                  ${escapeHtml(cake.category || 'Bolo Simples')}
+                </span>
+                ${cake.notes ? `<span class="simple-cake-notes" style="font-size: 13px; color: #64748b; font-style: italic;">📝 ${escapeHtml(cake.notes)}</span>` : ''}
+                <span id="simple-cake-badge-${cake.id}">${alertBadgeHtml}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- AÇÕES DO BOLO (EDITAR & EXCLUIR) -->
+          <div class="simple-cake-actions">
+            <button type="button" 
+                    class="btn-cake-action" 
+                    onclick="openSimpleCakeModal(${cake.id})" 
+                    title="Alterar dados do bolo">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <span>Alterar</span>
+            </button>
+            <button type="button" 
+                    class="btn-cake-action delete" 
+                    onclick="deleteSimpleCake(${cake.id})" 
+                    title="Excluir bolo">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <span>Excluir</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- COLUNA 2: QUANTIDADE (+ / -) -->
+        <div class="quick-col-quantity">
+          <button type="button" 
+                  class="quick-btn-step btn-minus" 
+                  title="Diminuir 1 unidade"
+                  onclick="adjustSimpleCakeQty(${cake.id}, -1)">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+
+          <div class="quick-qty-box" onclick="promptSimpleCakeQty(${cake.id})" title="Clique para digitar quantidade exata" style="cursor: pointer;">
+            <span class="quick-qty-number" id="simple-cake-qty-${cake.id}" style="color: ${qty === 0 ? '#ef4444' : '#0f172a'};">
+              ${qty}
+            </span>
+            <span class="quick-qty-unit">unidades</span>
+          </div>
+
+          <button type="button" 
+                  class="quick-btn-step btn-plus" 
+                  title="Adicionar 1 unidade"
+                  onclick="adjustSimpleCakeQty(${cake.id}, 1)">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterSimpleCakes() {
+  const input = document.getElementById('simpleCakeSearchInput');
+  const query = input ? input.value.toLowerCase().trim() : '';
+  if (!query) {
+    renderSimpleCakes(simpleCakesList);
+    return;
+  }
+  const filtered = simpleCakesList.filter(c => 
+    (c.name || '').toLowerCase().includes(query) || 
+    (c.category || '').toLowerCase().includes(query) ||
+    (c.notes || '').toLowerCase().includes(query)
+  );
+  renderSimpleCakes(filtered);
+}
+
+async function adjustSimpleCakeQty(cakeId, delta) {
+  const cake = simpleCakesList.find(c => c.id == cakeId);
+  if (!cake) return;
+
+  const prevQty = Number(cake.quantity) || 0;
+  const newQty = Math.max(0, prevQty + delta);
+
+  if (prevQty === 0 && delta < 0) {
+    showToast(`O estoque do bolo "${cake.name}" já está zerado!`, 'warning');
+    return;
+  }
+
+  // 1. Atualização Otimista Imediata (0ms)
+  cake.quantity = newQty;
+  cake.updated_at = new Date().toISOString();
+
+  const qtyEl = document.getElementById(`simple-cake-qty-${cakeId}`);
+  if (qtyEl) {
+    qtyEl.textContent = newQty;
+    qtyEl.style.color = newQty === 0 ? '#ef4444' : '#0f172a';
+    qtyEl.classList.remove('pulse-anim');
+    void qtyEl.offsetWidth; // trigger reflow
+    qtyEl.classList.add('pulse-anim');
+  }
+
+  const badgeEl = document.getElementById(`simple-cake-badge-${cakeId}`);
+  const rowEl = document.getElementById(`simple-cake-row-${cakeId}`);
+  if (badgeEl && rowEl) {
+    rowEl.classList.remove('status-normal', 'status-danger');
+    if (newQty === 0) {
+      rowEl.classList.add('status-danger');
+      badgeEl.innerHTML = `<span class="quick-status-badge badge-danger">⚠️ ESGOTADO / ZERADO</span>`;
+    } else {
+      rowEl.classList.add('status-normal');
+      badgeEl.innerHTML = `<span class="quick-status-badge badge-success">✓ DISPONÍVEL</span>`;
+    }
+  }
+
+  updateSimpleCakesStats();
+  localStorage.setItem('simple_cakes_cache', JSON.stringify(simpleCakesList));
+  showToast(`Bolo "${cake.name}": ${newQty} un`, 'info', 1400);
+
+  // 2. Sincronização em background no Supabase
+  try {
+    await supabaseClient
+      .from('simple_cakes')
+      .update({ quantity: newQty, updated_at: new Date().toISOString() })
+      .eq('id', cake.id);
+  } catch (err) {
+    console.warn('Erro ao atualizar quantidade no Supabase:', err);
+  }
+}
+
+function promptSimpleCakeQty(cakeId) {
+  const cake = simpleCakesList.find(c => c.id == cakeId);
+  if (!cake) return;
+
+  const val = prompt(`Definir quantidade exata de "${cake.name}":`, cake.quantity);
+  if (val === null) return; // cancelou
+
+  const parsed = parseInt(val, 10);
+  if (isNaN(parsed) || parsed < 0) {
+    showToast('Informe um número inteiro válido (zero ou maior).', 'warning');
+    return;
+  }
+
+  const delta = parsed - (Number(cake.quantity) || 0);
+  adjustSimpleCakeQty(cakeId, delta);
+}
+
+function openSimpleCakeModal(cakeId = null) {
+  const modal = document.getElementById('simpleCakeModal');
+  const title = document.getElementById('simpleCakeModalTitle');
+  const form = document.getElementById('simpleCakeForm');
+  if (!modal || !form) return;
+
+  form.reset();
+  if (cakeId) {
+    const cake = simpleCakesList.find(c => c.id == cakeId);
+    if (!cake) return;
+    title.textContent = 'Alterar Bolo';
+    document.getElementById('simpleCakeId').value = cake.id;
+    document.getElementById('simpleCakeName').value = cake.name || '';
+    document.getElementById('simpleCakeQty').value = cake.quantity ?? 0;
+    document.getElementById('simpleCakeCategory').value = cake.category || 'Bolo Caseiro';
+    document.getElementById('simpleCakeNotes').value = cake.notes || '';
+  } else {
+    title.textContent = 'Cadastrar Novo Bolo (Controle Rápido)';
+    document.getElementById('simpleCakeId').value = '';
+    document.getElementById('simpleCakeQty').value = '1';
+    document.getElementById('simpleCakeCategory').value = 'Bolo Caseiro';
+    document.getElementById('simpleCakeNotes').value = '';
+  }
+
+  openModal('simpleCakeModal');
+  setTimeout(() => {
+    const input = document.getElementById('simpleCakeName');
+    if (input) input.focus();
+  }, 100);
+}
+
+async function saveSimpleCake(event) {
+  event.preventDefault();
+
+  const id = document.getElementById('simpleCakeId')?.value;
+  const name = document.getElementById('simpleCakeName')?.value?.trim();
+  const quantity = Math.max(0, parseInt(document.getElementById('simpleCakeQty')?.value || '0', 10) || 0);
+  const category = document.getElementById('simpleCakeCategory')?.value?.trim() || 'Bolo Caseiro';
+  const notes = document.getElementById('simpleCakeNotes')?.value?.trim() || '';
+
+  if (!name) {
+    showToast('Informe o nome do bolo.', 'warning');
+    return;
+  }
+
+  const payload = {
+    name,
+    quantity,
+    category,
+    notes,
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    if (id) {
+      // Alterar bolo existente
+      const numId = Number(id);
+      const idx = simpleCakesList.findIndex(c => c.id == id);
+      if (idx !== -1) {
+        simpleCakesList[idx] = { ...simpleCakesList[idx], ...payload };
+      }
+      renderSimpleCakes(simpleCakesList);
+      closeModal('simpleCakeModal');
+      showToast(`Bolo "${name}" alterado com sucesso!`, 'success');
+
+      const { data, error } = await supabaseClient
+        .from('simple_cakes')
+        .update(payload)
+        .eq('id', numId)
+        .select();
+
+      if (error) throw error;
+      if (data && data[0] && idx !== -1) {
+        simpleCakesList[idx] = data[0];
+      }
+    } else {
+      // Cadastrar novo bolo
+      const tempId = Date.now();
+      const newCake = { id: tempId, ...payload, created_at: new Date().toISOString() };
+      simpleCakesList.push(newCake);
+      simpleCakesList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      renderSimpleCakes(simpleCakesList);
+      closeModal('simpleCakeModal');
+      showToast(`Bolo "${name}" cadastrado com sucesso!`, 'success');
+
+      const { data, error } = await supabaseClient
+        .from('simple_cakes')
+        .insert([{ name, quantity, category, notes }])
+        .select();
+
+      if (error) throw error;
+      if (data && data[0]) {
+        const tempIdx = simpleCakesList.findIndex(c => c.id === tempId);
+        if (tempIdx !== -1) {
+          simpleCakesList[tempIdx] = data[0];
+        }
+      }
+    }
+
+    localStorage.setItem('simple_cakes_cache', JSON.stringify(simpleCakesList));
+    renderSimpleCakes(simpleCakesList);
+  } catch (err) {
+    console.warn('Erro ao salvar bolo no Supabase, mantendo cache local:', err);
+    localStorage.setItem('simple_cakes_cache', JSON.stringify(simpleCakesList));
+    renderSimpleCakes(simpleCakesList);
+  }
+}
+
+async function deleteSimpleCake(cakeId) {
+  const cake = simpleCakesList.find(c => c.id == cakeId);
+  if (!cake) return;
+
+  if (!confirm(`Deseja realmente excluir o bolo "${cake.name}" do controle direto?`)) {
+    return;
+  }
+
+  // Remove localmente
+  simpleCakesList = simpleCakesList.filter(c => c.id != cakeId);
+  localStorage.setItem('simple_cakes_cache', JSON.stringify(simpleCakesList));
+  renderSimpleCakes(simpleCakesList);
+  showToast(`Bolo "${cake.name}" excluído.`, 'info');
+
+  try {
+    await supabaseClient
+      .from('simple_cakes')
+      .delete()
+      .eq('id', cakeId);
+  } catch (err) {
+    console.error('Erro ao excluir bolo no Supabase:', err);
+  }
+}
 
 function populateProductSelects() {
   // Select no modal de produção
@@ -1562,7 +1981,7 @@ function populateProductSelects() {
   const recSelect = document.getElementById('prodRecipeSelect');
   if (recSelect) {
     recSelect.innerHTML = '<option value="">Sem receita vinculada (custo manual)</option>' + 
-      recipesList.map(r => `<option value="${r.id}">${escapeHtml(r.name)} (Custo: ${formatBRL(r.laborcost || 0)})</option>`).join('');
+      recipesList.map(r => `<option value="${r.id}">${escapeHtml(r.name)} (Custo: ${formatBRL(getRecipeTotalCost(r))})</option>`).join('');
   }
 }
 
