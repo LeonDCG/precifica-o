@@ -1,6 +1,6 @@
 // ==========================================================================
 // MÓDULO DE RELATÓRIOS & CONCILIAÇÃO FINANCEIRA DELIVERY (99FOOD & IFOOD)
-// Concatenação Inteligente, Parser de Excel (.xlsx) e Métricas Consolidadas
+// Concatenação Inteligente, Separação por Mês, Parser de Excel e Métricas
 // ==========================================================================
 
 const DEFAULT_DELIVERY_ORDERS = [
@@ -568,9 +568,55 @@ const DEFAULT_DELIVERY_ORDERS = [
 ];
 
 let deliveryOrdersList = [];
-let currentDeliveryFilter = 'ALL';
+let currentDeliveryFilter = 'ALL'; // 'ALL', 'iFood', '99Food'
+let currentDeliveryMonth = 'AUTO'; // 'AUTO' (mês mais recente), 'ALL' (todos) ou 'YYYY-MM'
 let reportChannelChartInstance = null;
 let reportShareChartInstance = null;
+
+const MONTH_NAMES_PT = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
+// FORMATAÇÃO DE MÊS 'YYYY-MM' PARA 'Mês de AAAA'
+function formatMonthName(ym) {
+  if (!ym || ym === 'ALL') return 'Todos os Meses';
+  const parts = ym.split('-');
+  if (parts.length !== 2) return ym;
+  const year = parts[0];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const monthName = MONTH_NAMES_PT[monthIdx] || parts[1];
+  return `${monthName} de ${year}`;
+}
+
+function formatMonthShort(ym) {
+  if (!ym || ym === 'ALL') return 'Todos';
+  const parts = ym.split('-');
+  if (parts.length !== 2) return ym;
+  const year = parts[0];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const monthName = MONTH_NAMES_PT[monthIdx] || parts[1];
+  return `${monthName.slice(0, 3)}/${year}`;
+}
+
+// OBTÉM LISTA DE MESES DISPONÍVEIS A PARTIR DAS DATAS DOS PEDIDOS
+function getAvailableMonths() {
+  const monthMap = {};
+  deliveryOrdersList.forEach(o => {
+    if (!o.date) return;
+    const ym = o.date.slice(0, 7); // 'YYYY-MM'
+    if (ym && ym.length === 7) {
+      if (!monthMap[ym]) {
+        monthMap[ym] = { ym, total: 0, ifood: 0, food99: 0 };
+      }
+      monthMap[ym].total++;
+      if (o.channel === 'iFood') monthMap[ym].ifood++;
+      else if (o.channel === '99Food') monthMap[ym].food99++;
+    }
+  });
+
+  return Object.values(monthMap).sort((a, b) => b.ym.localeCompare(a.ym));
+}
 
 // INICIALIZAÇÃO DO MÓDULO DE RELATÓRIOS
 function initDeliveryReports() {
@@ -587,6 +633,12 @@ function initDeliveryReports() {
     deliveryOrdersList = JSON.parse(JSON.stringify(DEFAULT_DELIVERY_ORDERS));
   }
 
+  // Define mês padrão (o mais recente disponível)
+  if (currentDeliveryMonth === 'AUTO') {
+    const avail = getAvailableMonths();
+    currentDeliveryMonth = avail.length > 0 ? avail[0].ym : 'ALL';
+  }
+
   updateReportsBadges();
   setupExcelDropzone();
 }
@@ -596,15 +648,107 @@ function updateReportsBadges() {
   const count99El = document.getElementById('count99Badge');
   const countIfoodEl = document.getElementById('countIfoodBadge');
 
-  const count99 = deliveryOrdersList.filter(o => o.channel === '99Food').length;
-  const countIfood = deliveryOrdersList.filter(o => o.channel === 'iFood').length;
+  // Filtra de acordo com o mês selecionado
+  const monthOrders = getOrdersForActiveMonth();
+  const count99 = monthOrders.filter(o => o.channel === '99Food').length;
+  const countIfood = monthOrders.filter(o => o.channel === 'iFood').length;
 
   if (badgeEl) {
-    badgeEl.textContent = deliveryOrdersList.length;
-    badgeEl.style.display = deliveryOrdersList.length > 0 ? 'inline-block' : 'none';
+    badgeEl.textContent = monthOrders.length;
+    badgeEl.style.display = monthOrders.length > 0 ? 'inline-block' : 'none';
   }
   if (count99El) count99El.textContent = count99;
   if (countIfoodEl) countIfoodEl.textContent = countIfood;
+}
+
+// RETORNA OS PEDIDOS FILTRADOS PELO MÊS ATUAL
+function getOrdersForActiveMonth() {
+  if (!currentDeliveryMonth || currentDeliveryMonth === 'ALL') {
+    return deliveryOrdersList;
+  }
+  return deliveryOrdersList.filter(o => (o.date || '').slice(0, 7) === currentDeliveryMonth);
+}
+
+// NAVEGAÇÃO E CONTROLE POR MÊS
+function setDeliveryMonthFilter(monthVal) {
+  currentDeliveryMonth = monthVal;
+  renderReportsView();
+  if (typeof renderDashboard === 'function') renderDashboard();
+}
+
+function navigateDeliveryMonth(step) {
+  const months = getAvailableMonths();
+  if (months.length === 0) return;
+
+  if (currentDeliveryMonth === 'ALL') {
+    currentDeliveryMonth = months[0].ym;
+  } else {
+    const currentIdx = months.findIndex(m => m.ym === currentDeliveryMonth);
+    if (currentIdx === -1) {
+      currentDeliveryMonth = months[0].ym;
+    } else {
+      // step = -1 vai para mês anterior (mais antigo = index maior no sort decrescente)
+      // step = 1 vai para próximo mês (mais novo = index menor)
+      const targetIdx = currentIdx - step;
+      if (targetIdx >= 0 && targetIdx < months.length) {
+        currentDeliveryMonth = months[targetIdx].ym;
+      } else if (targetIdx >= months.length) {
+        showToast('Você já está no mês mais antigo disponível.', 'info', 1600);
+        return;
+      } else if (targetIdx < 0) {
+        showToast('Você já está no mês mais recente disponível.', 'info', 1600);
+        return;
+      }
+    }
+  }
+
+  renderReportsView();
+  if (typeof renderDashboard === 'function') renderDashboard();
+}
+
+// RENDERIZAÇÃO DOS CONTROLES DO SELETOR DE MÊS
+function renderMonthControls() {
+  const select = document.getElementById('reportMonthSelect');
+  const chipsContainer = document.getElementById('reportMonthChips');
+  const descEl = document.getElementById('currentMonthLabelDesc');
+  const months = getAvailableMonths();
+
+  if (!select) return;
+
+  // Monta opções do select
+  let selectHtml = `<option value="ALL" ${currentDeliveryMonth === 'ALL' ? 'selected' : ''}>🌐 Todos os Meses Acumulados (${deliveryOrdersList.length} pedidos)</option>`;
+  months.forEach(m => {
+    const isSelected = m.ym === currentDeliveryMonth ? 'selected' : '';
+    selectHtml += `<option value="${m.ym}" ${isSelected}>📅 ${formatMonthName(m.ym)} (${m.total} pedidos)</option>`;
+  });
+  select.innerHTML = selectHtml;
+
+  // Descrição do mês ativo
+  if (descEl) {
+    if (currentDeliveryMonth === 'ALL') {
+      descEl.textContent = `Visualizando dados acumulados de todos os períodos (${deliveryOrdersList.length} pedidos)`;
+    } else {
+      descEl.textContent = `Apuração ativa de ${formatMonthName(currentDeliveryMonth)}`;
+    }
+  }
+
+  // Chips de acesso rápido aos meses
+  if (chipsContainer) {
+    let chipsHtml = `
+      <button class="month-chip ${currentDeliveryMonth === 'ALL' ? 'active' : ''}" onclick="setDeliveryMonthFilter('ALL')">
+        🌐 Todos (${deliveryOrdersList.length})
+      </button>
+    `;
+    months.forEach(m => {
+      const activeClass = m.ym === currentDeliveryMonth ? 'active' : '';
+      chipsHtml += `
+        <button class="month-chip ${activeClass}" onclick="setDeliveryMonthFilter('${m.ym}')">
+          📅 ${formatMonthShort(m.ym)} (${m.total})
+        </button>
+      `;
+    });
+    chipsContainer.innerHTML = chipsHtml;
+  }
 }
 
 // DRAG AND DROP SETUP
@@ -653,6 +797,7 @@ async function processExcelFiles(fileList) {
 
   let totalImported = 0;
   let detectedChannels = new Set();
+  let affectedMonths = new Set();
 
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
@@ -680,11 +825,13 @@ async function processExcelFiles(fileList) {
         mergeDeliveryOrders(parsed);
         totalImported += parsed.length;
         detectedChannels.add('iFood');
+        parsed.forEach(p => affectedMonths.add((p.date || '').slice(0, 7)));
       } else if (is99) {
         const parsed = parse99Sheet(headers, rows);
         mergeDeliveryOrders(parsed);
         totalImported += parsed.length;
         detectedChannels.add('99Food');
+        parsed.forEach(p => affectedMonths.add((p.date || '').slice(0, 7)));
       } else {
         showToast('Formato desconhecido no arquivo "' + file.name + '". Utilize relatórios da 99Food ou iFood.', 'warning');
       }
@@ -696,6 +843,11 @@ async function processExcelFiles(fileList) {
 
   if (totalImported > 0) {
     localStorage.setItem('delivery_reports_cache', JSON.stringify(deliveryOrdersList));
+    // Se o mês ativo não tiver dados, aponta para o mês importado mais recente
+    if (affectedMonths.size > 0 && currentDeliveryMonth !== 'ALL') {
+      const sortedMonths = Array.from(affectedMonths).sort().reverse();
+      currentDeliveryMonth = sortedMonths[0];
+    }
     updateReportsBadges();
     renderReportsView();
     if (typeof renderDashboard === 'function') renderDashboard();
@@ -872,11 +1024,15 @@ function filterDeliveryOrders() {
   const searchInput = document.getElementById('reportSearchInput');
   const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
 
-  let list = deliveryOrdersList;
+  // Primeiro filtra pelo mês ativo
+  let list = getOrdersForActiveMonth();
+
+  // Depois filtra pelo canal
   if (currentDeliveryFilter !== 'ALL') {
     list = list.filter(o => o.channel.toLowerCase() === currentDeliveryFilter.toLowerCase());
   }
 
+  // Depois filtra pela busca textual
   if (query) {
     list = list.filter(o => 
       (o.order_number || '').toLowerCase().includes(query) ||
@@ -893,13 +1049,16 @@ function filterDeliveryOrders() {
 
 // RENDERIZAÇÃO DA VIEW DE RELATÓRIOS
 function renderReportsView() {
+  renderMonthControls();
   updateReportsBadges();
 
-  const completed = deliveryOrdersList.filter(o => o.status === 'CONCLUIDO');
+  // Pega os pedidos do mês ativo
+  const monthOrders = getOrdersForActiveMonth();
+  const completed = monthOrders.filter(o => o.status === 'CONCLUIDO');
   const ifoodCompleted = completed.filter(o => o.channel === 'iFood');
   const food99Completed = completed.filter(o => o.channel === '99Food');
 
-  // 1. Métricas Consolidadas
+  // 1. Métricas Consolidadas do Mês
   const totGross = completed.reduce((acc, o) => acc + (Number(o.gross_value) || 0), 0);
   const totNet = completed.reduce((acc, o) => acc + (Number(o.net_value) || 0), 0);
   const totComm = completed.reduce((acc, o) => acc + (Number(o.commission) || 0), 0);
@@ -920,7 +1079,12 @@ function renderReportsView() {
   setText('repEffectiveMarginPct', `Margem líquida das plataformas: ${effectiveMarginPct.toFixed(1)}%`);
   setText('repTicketMedio', `Ticket Médio: ${formatBRL(ticketMedio)}`);
 
-  // 2. Card iFood
+  // Subtítulo do cabeçalho de período
+  const periodLabel = currentDeliveryMonth === 'ALL' ? 'Todos os Meses' : formatMonthName(currentDeliveryMonth);
+  setText('ifoodPeriodMeta', `Apuração: ${periodLabel}`);
+  setText('food99PeriodMeta', `Apuração: ${periodLabel}`);
+
+  // 2. Card iFood do Mês
   const ifoodGross = ifoodCompleted.reduce((acc, o) => acc + (Number(o.gross_value) || 0), 0);
   const ifoodNet = ifoodCompleted.reduce((acc, o) => acc + (Number(o.net_value) || 0), 0);
   const ifoodFees = ifoodCompleted.reduce((acc, o) => acc + (Number(o.commission) || 0), 0);
@@ -936,7 +1100,7 @@ function renderReportsView() {
   setText('ifoodTicketMedio', formatBRL(ifoodTicket));
   setText('ifoodDiscountsVal', formatBRL(ifoodDisc));
 
-  // 3. Card 99Food
+  // 3. Card 99Food do Mês
   const food99Gross = food99Completed.reduce((acc, o) => acc + (Number(o.gross_value) || 0), 0);
   const food99Net = food99Completed.reduce((acc, o) => acc + (Number(o.net_value) || 0), 0);
   const food99Fees = food99Completed.reduce((acc, o) => acc + (Number(o.commission) || 0), 0);
@@ -952,16 +1116,108 @@ function renderReportsView() {
   setText('food99TicketMedio', formatBRL(food99Ticket));
   setText('food99DiscountsVal', formatBRL(food99Disc));
 
-  // 4. Gráficos
+  // 4. Renderizar Tabela Comparativa de Evolução Mês a Mês
+  renderMonthlyEvolutionTable();
+
+  // 5. Gráficos do Mês
   renderReportCharts(ifoodGross, ifoodNet, food99Gross, food99Net, ifoodCompleted.length, food99Completed.length);
 
-  // 5. Tabela
+  // 6. Tabela Analítica
   filterDeliveryOrders();
 }
 
 function setText(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text;
+}
+
+// RENDERIZAÇÃO DA TABELA DE EVOLUÇÃO MÊS A MÊS
+function renderMonthlyEvolutionTable() {
+  const tbody = document.getElementById('monthlyEvolutionTableBody');
+  if (!tbody) return;
+
+  const months = getAvailableMonths();
+  if (months.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">Nenhum mês apurado.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = months.map(m => {
+    const mOrders = deliveryOrdersList.filter(o => (o.date || '').slice(0, 7) === m.ym && o.status === 'CONCLUIDO');
+    const mIfood = mOrders.filter(o => o.channel === 'iFood');
+    const mFood99 = mOrders.filter(o => o.channel === '99Food');
+
+    const gross = mOrders.reduce((a, o) => a + (Number(o.gross_value) || 0), 0);
+    const disc = mOrders.reduce((a, o) => a + (Number(o.discounts) || 0), 0);
+    const fees = mOrders.reduce((a, o) => a + (Number(o.commission) || 0), 0);
+    const net = mOrders.reduce((a, o) => a + (Number(o.net_value) || 0), 0);
+    const retentionRate = gross > 0 ? ((gross - net) / gross) * 100 : 0;
+    const ticket = mOrders.length > 0 ? gross / mOrders.length : 0;
+
+    const isActive = m.ym === currentDeliveryMonth;
+
+    return `
+      <tr class="${isActive ? 'month-row-active' : ''}">
+        <td>
+          <strong>${formatMonthName(m.ym)}</strong>
+          ${isActive ? '<span class="active-month-pill">MÊS ATIVO</span>' : ''}
+        </td>
+        <td>
+          <span style="font-size: 12.5px;">
+            <strong style="color: #ea1d2c;">${mIfood.length} iFood</strong> + 
+            <strong style="color: #f97316;">${mFood99.length} 99</strong> 
+            (${mOrders.length} tot)
+          </span>
+        </td>
+        <td><strong>${formatBRL(gross)}</strong></td>
+        <td style="color: #b91c1c;">${disc > 0 ? '- ' + formatBRL(disc) : '-'}</td>
+        <td style="color: #dc2626;">- ${formatBRL(fees)}</td>
+        <td class="text-green font-bold">${formatBRL(net)}</td>
+        <td>
+          <span style="font-weight: 700; color: ${retentionRate > 28 ? '#ea580c' : '#475569'};">
+            ${retentionRate.toFixed(1)}%
+          </span>
+        </td>
+        <td>${formatBRL(ticket)}</td>
+        <td class="text-right">
+          <button type="button" class="btn btn-sm ${isActive ? 'btn-primary' : 'btn-secondary'}" onclick="setDeliveryMonthFilter('${m.ym}')">
+            ${isActive ? '✓ Selecionado' : 'Ver Detalhes'}
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const tfoot = document.getElementById('monthlyEvolutionTableFoot');
+  if (tfoot) {
+    const allCompleted = deliveryOrdersList.filter(o => o.status === 'CONCLUIDO');
+    const totGross = allCompleted.reduce((a, o) => a + (Number(o.gross_value) || 0), 0);
+    const totDisc = allCompleted.reduce((a, o) => a + (Number(o.discounts) || 0), 0);
+    const totFees = allCompleted.reduce((a, o) => a + (Number(o.commission) || 0), 0);
+    const totNet = allCompleted.reduce((a, o) => a + (Number(o.net_value) || 0), 0);
+    const totRet = totGross > 0 ? ((totGross - totNet) / totGross) * 100 : 0;
+    const totTicket = allCompleted.length > 0 ? totGross / allCompleted.length : 0;
+    const ifoodTot = allCompleted.filter(o => o.channel === 'iFood').length;
+    const food99Tot = allCompleted.filter(o => o.channel === '99Food').length;
+
+    tfoot.innerHTML = `
+      <tr>
+        <td><strong>TOTAL ACUMULADO GERAL</strong></td>
+        <td><strong>${ifoodTot} iFood + ${food99Tot} 99 (${allCompleted.length} tot)</strong></td>
+        <td><strong>${formatBRL(totGross)}</strong></td>
+        <td style="color: #b91c1c;">${totDisc > 0 ? '- ' + formatBRL(totDisc) : '-'}</td>
+        <td style="color: #dc2626;">- ${formatBRL(totFees)}</td>
+        <td class="text-green font-bold"><strong>${formatBRL(totNet)}</strong></td>
+        <td><strong>${totRet.toFixed(1)}%</strong></td>
+        <td><strong>${formatBRL(totTicket)}</strong></td>
+        <td class="text-right">
+          <button type="button" class="btn btn-sm ${currentDeliveryMonth === 'ALL' ? 'btn-primary' : 'btn-secondary'}" onclick="setDeliveryMonthFilter('ALL')">
+            ${currentDeliveryMonth === 'ALL' ? '✓ Selecionado' : 'Ver Todos'}
+          </button>
+        </td>
+      </tr>
+    `;
+  }
 }
 
 // RENDERIZAÇÃO DE GRÁFICOS DO MÓDULO DE RELATÓRIOS
@@ -1043,10 +1299,14 @@ function renderOrdersTable(list) {
   const summaryEl = document.getElementById('tableCountSummary');
   if (!tbody) return;
 
-  if (summaryEl) summaryEl.textContent = `Exibindo ${list.length} de ${deliveryOrdersList.length} pedidos conciliados`;
+  const totalMonthOrders = getOrdersForActiveMonth().length;
+  if (summaryEl) {
+    const monthText = currentDeliveryMonth === 'ALL' ? 'todos os meses' : formatMonthName(currentDeliveryMonth);
+    summaryEl.textContent = `Exibindo ${list.length} de ${totalMonthOrders} pedidos (${monthText})`;
+  }
 
   if (!list || list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-muted">Nenhum pedido encontrado para os filtros selecionados.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-muted">Nenhum pedido encontrado para o mês e filtros selecionados.</td></tr>';
     if (tfoot) tfoot.innerHTML = '';
     return;
   }
@@ -1097,7 +1357,7 @@ function renderOrdersTable(list) {
 
     tfoot.innerHTML = `
       <tr>
-        <td colspan="5">TOTAIS CONSOLIDADOS (${validOrders.length} pedidos concluídos):</td>
+        <td colspan="5">TOTAIS FILTRADOS (${validOrders.length} pedidos concluídos):</td>
         <td>${formatBRL(totGross)}</td>
         <td style="color: #b91c1c;">${totDisc > 0 ? '- ' + formatBRL(totDisc) : '-'}</td>
         <td style="color: #dc2626;">- ${formatBRL(totComm)}</td>
@@ -1118,15 +1378,16 @@ function toggleReportDocAccordion() {
   if (btn) btn.textContent = isHidden ? 'Ocultar Detalhes' : 'Ver Detalhes';
 }
 
-// EXPORTAÇÃO CSV
+// EXPORTAÇÃO CSV DO MÊS ATIVO OU GERAL
 function exportConcatenatedCSV() {
-  if (!deliveryOrdersList || deliveryOrdersList.length === 0) {
-    showToast('Nenhum pedido para exportar.', 'warning');
+  const listToExport = getOrdersForActiveMonth();
+  if (!listToExport || listToExport.length === 0) {
+    showToast('Nenhum pedido para exportar neste período.', 'warning');
     return;
   }
 
   const headers = ['Canal', 'ID Pedido', 'ID Completo', 'Data', 'Turno', 'Status', 'Valor Bruto', 'Total Pago Cliente', 'Descontos Loja', 'Taxas e Comissoes', 'Valor Liquido', 'Forma Pagamento', 'Logistica'];
-  const rows = deliveryOrdersList.map(o => [
+  const rows = listToExport.map(o => [
     o.channel,
     o.order_number,
     o.full_order_id,
@@ -1147,13 +1408,14 @@ function exportConcatenatedCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `relatorio_delivery_consolidado_99_ifood_${new Date().toISOString().slice(0, 10)}.csv`;
+  const suffix = currentDeliveryMonth === 'ALL' ? 'todos_meses' : currentDeliveryMonth;
+  a.download = `relatorio_delivery_consolidado_99_ifood_${suffix}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  showToast('Relatório consolidado exportado em CSV com sucesso!', 'success');
+  showToast(`Relatório do período (${suffix}) exportado em CSV!`, 'success');
 }
 
 // RESTAURAR ORIGINAIS
@@ -1161,20 +1423,27 @@ function restoreDefaultReports() {
   if (!confirm('Deseja restaurar os relatórios oficiais originais (33 pedidos da 99Food e iFood)?')) return;
   deliveryOrdersList = JSON.parse(JSON.stringify(DEFAULT_DELIVERY_ORDERS));
   localStorage.setItem('delivery_reports_cache', JSON.stringify(deliveryOrdersList));
-  updateReportsBadges();
+  currentDeliveryMonth = 'AUTO';
+  initDeliveryReports();
   renderReportsView();
   if (typeof renderDashboard === 'function') renderDashboard();
   showToast('Planilhas originais restauradas com sucesso!', 'info');
 }
 
 // FORNECEDOR DE MÉTRICAS PARA O DASHBOARD GERAL
-function getDeliveryDashboardMetrics() {
-  const completed = deliveryOrdersList.filter(o => o.status === 'CONCLUIDO');
-  const totalGross = completed.reduce((acc, o) => acc + (Number(o.gross_value) || 0), 0);
-  const totalNet = completed.reduce((acc, o) => acc + (Number(o.net_value) || 0), 0);
-  const totalOrders = completed.length;
-  const ifoodCount = completed.filter(o => o.channel === 'iFood').length;
-  const food99Count = completed.filter(o => o.channel === '99Food').length;
+function getDeliveryDashboardMetrics(targetYearMonth = null) {
+  let list = deliveryOrdersList.filter(o => o.status === 'CONCLUIDO');
+  if (targetYearMonth && targetYearMonth !== 'ALL') {
+    list = list.filter(o => (o.date || '').slice(0, 7) === targetYearMonth);
+  } else if (!targetYearMonth && currentDeliveryMonth !== 'ALL') {
+    list = list.filter(o => (o.date || '').slice(0, 7) === currentDeliveryMonth);
+  }
+
+  const totalGross = list.reduce((acc, o) => acc + (Number(o.gross_value) || 0), 0);
+  const totalNet = list.reduce((acc, o) => acc + (Number(o.net_value) || 0), 0);
+  const totalOrders = list.length;
+  const ifoodCount = list.filter(o => o.channel === 'iFood').length;
+  const food99Count = list.filter(o => o.channel === '99Food').length;
 
   return { totalGross, totalNet, totalOrders, ifoodCount, food99Count };
 }

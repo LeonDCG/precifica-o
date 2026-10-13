@@ -558,6 +558,40 @@
           </div>
         </div>
 
+        <!-- BARRA SELETORA DE MÊS / PERÍODO -->
+        <div class="reports-month-bar">
+          <div class="month-selector-main">
+            <div class="month-selector-info">
+              <span class="month-badge-icon">📅</span>
+              <div>
+                <span class="month-title-label">Mês de Apuração:</span>
+                <span class="month-active-desc" id="currentMonthLabelDesc">Carregando período...</span>
+              </div>
+            </div>
+
+            <div class="month-nav-controls">
+              <button type="button" class="btn btn-sm btn-secondary month-nav-btn" onclick="navigateDeliveryMonth(-1)" title="Mês Anterior">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                <span>Anterior</span>
+              </button>
+
+              <select id="reportMonthSelect" class="form-select month-select" onchange="setDeliveryMonthFilter(this.value)">
+                <!-- Opções populadas dinamicamente: Todos os Meses, Outubro de 2026, Setembro de 2026... -->
+              </select>
+
+              <button type="button" class="btn btn-sm btn-secondary month-nav-btn" onclick="navigateDeliveryMonth(1)" title="Próximo Mês">
+                <span>Próximo</span>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- CHIPS DE ACESSO RÁPIDO AOS MESES -->
+          <div class="month-quick-chips" id="reportMonthChips">
+            <!-- Populado dinamicamente: Todos, Out/2026, Set/2026... -->
+          </div>
+        </div>
+
         <!-- DROPZONE / ARRASTAR EXCEL -->
         <div class="excel-dropzone" id="excelDropZone" onclick="document.getElementById('excelReportFileInput').click()">
           <div class="dropzone-icon">📊</div>
@@ -711,6 +745,42 @@
                 <strong id="food99LogisticsVal">Entrega da Plataforma 99</strong>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- TABELA DE EVOLUÇÃO MÊS A MÊS (COMPARATIVO HISTÓRICO) -->
+        <div class="card monthly-evolution-card" style="margin-bottom: 24px;">
+          <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 class="card-title">📅 Evolução & Fechamento Mês a Mês</h2>
+              <span class="card-subtitle">Comparativo mensal consolidado de receitas brutas, retenções das plataformas e repasse líquido</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-muted); font-weight: 600;">
+              Clique em "Ver Detalhes" para filtrar todo o painel pelo mês
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Mês de Referência</th>
+                  <th>Pedidos por Canal</th>
+                  <th>Faturamento Bruto</th>
+                  <th>Descontos Loja</th>
+                  <th>Taxas / Comissões</th>
+                  <th>Líquido Recebido</th>
+                  <th>% Retenção</th>
+                  <th>Ticket Médio</th>
+                  <th class="text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="monthlyEvolutionTableBody">
+                <!-- Populado dinamicamente por renderMonthlyEvolutionTable() -->
+              </tbody>
+              <tfoot id="monthlyEvolutionTableFoot" style="font-weight: 800; background: #f8fafc; border-top: 2px solid var(--color-border);">
+                <!-- Preenchido dinamicamente com totais acumulados -->
+              </tfoot>
+            </table>
           </div>
         </div>
 

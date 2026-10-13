@@ -2423,3 +2423,165 @@ body {
   border: 1px solid #fed7aa;
 }
 
+/* ==========================================================================
+   17. SELETOR E APURAÇÃO MENSAL DE RELATÓRIOS DELIVERY
+   ========================================================================== */
+.reports-month-bar {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.month-selector-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.month-selector-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.month-badge-icon {
+  font-size: 24px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.month-title-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #0284c7;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.month-active-desc {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.month-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.month-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+}
+
+.month-select {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  background-color: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-width: 250px;
+  transition: all var(--transition-fast);
+}
+
+.month-select:focus {
+  border-color: #0284c7;
+  outline: none;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+
+.month-quick-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.month-chip {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.month-chip:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+.month-chip.active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border-color: #0284c7;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+  font-weight: 700;
+}
+
+/* TABELA DE EVOLUÇÃO MÊS A MÊS */
+.monthly-evolution-card {
+  border-top: 3px solid #0284c7;
+}
+
+.month-row-active {
+  background: #f0f9ff !important;
+  border-left: 4px solid #0284c7;
+}
+
+.month-row-active td {
+  font-weight: 600;
+}
+
+.active-month-pill {
+  display: inline-block;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  margin-left: 8px;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+
