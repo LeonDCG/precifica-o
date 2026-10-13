@@ -8,11 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="ponto_os/ponto_os.css">
   <!-- Supabase JS CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS (xlsx) CDN para leitura e concatenação de planilhas Excel 99 e iFood -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <!-- BARREIRA DE ACESSO EXCLUSIVO COMPUTADOR (DESKTOP/NOTEBOOK) -->
@@ -75,21 +76,10 @@
           <span>Registro de Vendas</span>
         </button>
 
-        <div class="nav-divider" style="margin: 14px 16px 8px 16px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 10px; font-weight: 800; color: #db2777; text-transform: uppercase; letter-spacing: 0.8px; padding-top: 10px; display: flex; align-items: center; gap: 6px;">
-          <span>🤖</span> <span>PONTO OS • IA</span>
-        </div>
-        <button class="nav-item" data-view="ponto-command">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <span>Central de Comando</span>
-        </button>
-        <button class="nav-item" data-view="ponto-approvals">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>Ações da IA</span>
-          <span class="badge-counter" id="navApprovalBadge" style="display: none; background: #ef4444;">0</span>
-        </button>
-        <button class="nav-item" data-view="ponto-chat">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span>Chat Ponto Master</span>
+        <button class="nav-item" data-view="reports" style="border-left: 3px solid #0284c7;">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          <span>Relatórios (99 & iFood)</span>
+          <span class="badge-counter" id="reportsOrdersBadge" style="display: none; background: #0284c7; color: #fff;">0</span>
         </button>
       </nav>
 
@@ -530,19 +520,315 @@
         </div>
       </section>
 
-      <!-- VIEW: PONTO OS - CENTRAL DE COMANDO -->
-      <section id="view-ponto-command" class="content-view">
-        <!-- Renderizado dinamicamente por CommandCenterUI -->
-      </section>
+      <!-- VIEW: RELATÓRIOS E CONCILIAÇÃO DELIVERY (99FOOD & IFOOD) -->
+      <section id="view-reports" class="content-view">
+        <!-- BARRA SUPERIOR DE CONTROLES DO MÓDULO -->
+        <div class="reports-top-bar">
+          <div class="search-box" style="max-width: 380px;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="reportSearchInput" class="input-search" placeholder="Buscar pedido, turno, forma pgto..." oninput="filterDeliveryOrders()">
+          </div>
 
-      <!-- VIEW: PONTO OS - CENTRAL DE APROVAÇÕES (AÇÕES DA IA) -->
-      <section id="view-ponto-approvals" class="content-view">
-        <!-- Renderizado dinamicamente por ApprovalsCenterUI -->
-      </section>
+          <!-- FILTROS RÁPIDOS POR PLATAFORMA -->
+          <div class="reports-filter-chips">
+            <button class="filter-chip active" id="chipChannelAll" onclick="setDeliveryChannelFilter('ALL')">Todos os Canais</button>
+            <button class="filter-chip ifood" id="chipChannelIfood" onclick="setDeliveryChannelFilter('iFood')">
+              <span class="chip-dot ifood"></span> iFood (<span id="countIfoodBadge">0</span>)
+            </button>
+            <button class="filter-chip food99" id="chipChannel99" onclick="setDeliveryChannelFilter('99Food')">
+              <span class="chip-dot food99"></span> 99Food (<span id="count99Badge">0</span>)
+            </button>
+          </div>
 
-      <!-- VIEW: PONTO OS - CHAT COM O PONTO MASTER -->
-      <section id="view-ponto-chat" class="content-view">
-        <!-- Renderizado dinamicamente por MasterChatUI -->
+          <!-- BOTÕES DE AÇÃO -->
+          <div class="reports-actions">
+            <input type="file" id="excelReportFileInput" accept=".xlsx, .xls, .csv" style="display: none;" multiple onchange="handleExcelReportUpload(event)">
+            <button class="btn btn-primary" onclick="document.getElementById('excelReportFileInput').click()" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border: none;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span>+ Importar Planilha Excel (.xlsx)</span>
+            </button>
+            <button class="btn btn-secondary" onclick="exportConcatenatedCSV()" title="Exportar dados unificados em formato CSV">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Exportar (.csv)</span>
+            </button>
+            <button class="btn btn-secondary" onclick="restoreDefaultReports()" title="Recarregar dados originais das planilhas oficiais">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Restaurar Originais</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- DROPZONE / ARRASTAR EXCEL -->
+        <div class="excel-dropzone" id="excelDropZone" onclick="document.getElementById('excelReportFileInput').click()">
+          <div class="dropzone-icon">📊</div>
+          <div class="dropzone-text">
+            <strong>Clique aqui ou arraste seus relatórios em Excel (.xlsx) da 99Food ou iFood</strong>
+            <p>Reconhecimento automático: Detecta o modelo da planilha e concatena os dados instantaneamente com cálculo de taxas e lucros líquidos.</p>
+          </div>
+          <div class="dropzone-badges">
+            <span class="platform-tag ifood">✓ Suporta Relatório iFood (.xlsx)</span>
+            <span class="platform-tag food99">✓ Suporta Dados 99Food (.xlsx)</span>
+          </div>
+        </div>
+
+        <!-- CARDS DE MÉTRICAS CONSOLIDADAS -->
+        <div class="stats-grid" style="margin-bottom: 24px;">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">FATURAMENTO BRUTO TOTAL</span>
+              <span class="stat-badge blue">99 + iFood</span>
+            </div>
+            <div class="stat-value" id="repTotalGross">R$ 0,00</div>
+            <div class="stat-footer positive" id="repTotalItemsCount">0 itens vendidos</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">LÍQUIDO REAL RECEBIDO</span>
+              <span class="stat-badge green">Depositado</span>
+            </div>
+            <div class="stat-value text-green" id="repTotalNet">R$ 0,00</div>
+            <div class="stat-footer" id="repEffectiveMarginPct">Margem líquida das plataformas: 0%</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">COMISSÕES & RETENÇÃO TOTAL</span>
+              <span class="stat-badge warning">Taxas Plataformas</span>
+            </div>
+            <div class="stat-value" id="repTotalCommissions" style="color: #dc2626;">R$ 0,00</div>
+            <div class="stat-footer" id="repEffectiveCommissionPct">Taxa média efetiva: 0%</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">DESCONTOS & INCENTIVOS LOJA</span>
+              <span class="stat-badge purple">Marketing/Frete</span>
+            </div>
+            <div class="stat-value" id="repTotalDiscounts">R$ 0,00</div>
+            <div class="stat-footer" id="repTotalDiscountsSub">Cupons e coparticipações</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">TOTAL DE PEDIDOS</span>
+              <span class="stat-badge teal">Concluídos</span>
+            </div>
+            <div class="stat-value" id="repTotalOrdersCount">0</div>
+            <div class="stat-footer" id="repTicketMedio">Ticket Médio: R$ 0,00</div>
+          </div>
+        </div>
+
+        <!-- COMPARATIVO LADO A LADO: IFOOD vs 99FOOD -->
+        <div class="delivery-comparison-grid">
+          <!-- CARD IFOOD -->
+          <div class="card platform-card ifood-card">
+            <div class="platform-card-header">
+              <div class="platform-brand">
+                <span class="platform-icon">🔴</span>
+                <div>
+                  <h3 class="platform-title">iFood Delivery</h3>
+                  <span class="platform-meta" id="ifoodPeriodMeta">Relatório Conciliado Oficial</span>
+                </div>
+              </div>
+              <span class="platform-orders-badge ifood" id="ifoodOrdersBadge">0 Pedidos</span>
+            </div>
+            <div class="platform-kpi-row">
+              <div class="platform-kpi">
+                <span class="kpi-label">Faturamento Bruto:</span>
+                <strong class="kpi-value" id="ifoodGrossVal">R$ 0,00</strong>
+              </div>
+              <div class="platform-kpi">
+                <span class="kpi-label">Valor Líquido Recebido:</span>
+                <strong class="kpi-value text-green" id="ifoodNetVal">R$ 0,00</strong>
+              </div>
+              <div class="platform-kpi">
+                <span class="kpi-label">Comissões + Taxas:</span>
+                <strong class="kpi-value text-danger" id="ifoodFeesVal">R$ 0,00</strong>
+              </div>
+              <div class="platform-kpi">
+                <span class="kpi-label">Taxa Média Efetiva:</span>
+                <strong class="kpi-value" id="ifoodRateVal" style="color: #ea1d2c;">0%</strong>
+              </div>
+            </div>
+            <div class="platform-details-list">
+              <div class="detail-item">
+                <span>Ticket Médio:</span>
+                <strong id="ifoodTicketMedio">R$ 0,00</strong>
+              </div>
+              <div class="detail-item">
+                <span>Incentivos Promocionais da Loja:</span>
+                <strong id="ifoodDiscountsVal">R$ 0,00</strong>
+              </div>
+              <div class="detail-item">
+                <span>Logística Predominante:</span>
+                <strong id="ifoodLogisticsVal">Entrega Parceira iFood</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 99FOOD -->
+          <div class="card platform-card food99-card">
+            <div class="platform-card-header">
+              <div class="platform-brand">
+                <span class="platform-icon">🟠</span>
+                <div>
+                  <h3 class="platform-title">99Food Delivery</h3>
+                  <span class="platform-meta" id="food99PeriodMeta">Relatório Conciliado Oficial</span>
+                </div>
+              </div>
+              <span class="platform-orders-badge food99" id="food99OrdersBadge">0 Pedidos</span>
+            </div>
+            <div class="platform-kpi-row">
+              <div class="platform-kpi">
+                <span class="kpi-label">Faturamento Bruto:</span>
+                <strong class="kpi-value" id="food99GrossVal">R$ 0,00</strong>
+              </div>
+              <div class="platform-kpi">
+                <span class="kpi-label">Valor Líquido Recebido:</span>
+                <strong class="kpi-value text-green" id="food99NetVal">R$ 0,00</strong>
+              </div>
+              <div class="platform-kpi">
+                <span class="kpi-label">Comissões + Taxas:</span>
+                <strong class="kpi-value text-danger" id="food99FeesVal">R$ 0,00</strong>
+              </div>
+              <div class="platform-kpi">
+                <span class="kpi-label">Taxa Média Efetiva:</span>
+                <strong class="kpi-value" id="food99RateVal" style="color: #f97316;">0%</strong>
+              </div>
+            </div>
+            <div class="platform-details-list">
+              <div class="detail-item">
+                <span>Ticket Médio:</span>
+                <strong id="food99TicketMedio">R$ 0,00</strong>
+              </div>
+              <div class="detail-item">
+                <span>Marketing & Frete Grátis Loja:</span>
+                <strong id="food99DiscountsVal">R$ 0,00</strong>
+              </div>
+              <div class="detail-item">
+                <span>Logística Predominante:</span>
+                <strong id="food99LogisticsVal">Entrega da Plataforma 99</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GRÁFICOS DO MÓDULO DE RELATÓRIOS -->
+        <div class="charts-grid" style="margin-bottom: 24px;">
+          <div class="card chart-card">
+            <div class="card-header">
+              <h2 class="card-title">Faturamento vs Líquido por Plataforma</h2>
+              <span class="card-subtitle">Comparativo real de repasse financeiro</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="reportChannelChart"></canvas>
+            </div>
+          </div>
+          <div class="card chart-card">
+            <div class="card-header">
+              <h2 class="card-title">Distribuição de Pedidos e Comissões</h2>
+              <span class="card-subtitle">Participação percentual por canal</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="reportShareChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- DOCUMENTAÇÃO FINANCEIRA & REGRAS DE CONCILIAÇÃO -->
+        <div class="card report-doc-card" style="margin-bottom: 24px;">
+          <div class="doc-header" onclick="toggleReportDocAccordion()" style="cursor: pointer;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 24px;">📑</span>
+              <div>
+                <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #1e293b;">Documentação Técnica & Memória de Cálculo da Concatenação</h3>
+                <p style="margin: 0; font-size: 13px; color: #64748b;">Entenda como os relatórios Excel da 99Food e do iFood são unificados e calculados</p>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-secondary" id="btnToggleDoc">Ver Detalhes</button>
+          </div>
+          <div id="reportDocContent" class="doc-body" style="display: none; padding-top: 16px; border-top: 1px solid var(--color-border); margin-top: 16px;">
+            <div class="doc-grid">
+              <div class="doc-section">
+                <h4>🔴 Conciliação Oficial iFood</h4>
+                <p>No relatório de pedidos do iFood (.xlsx), o repasse financeiro é apurado da seguinte forma:</p>
+                <ul>
+                  <li><strong>Valor dos Itens:</strong> Preço bruto de tabela dos produtos pedidos pelo cliente.</li>
+                  <li><strong>Taxas e Comissões:</strong> Comissão percentual do plano contratado + comissão de intermediação e transação financeira.</li>
+                  <li><strong>Incentivo Promocional da Loja:</strong> Cupons ou descontos concedidos pela Doce & Ponto aos clientes.</li>
+                  <li><strong>Fórmula:</strong> <code>Valor Líquido = Valor dos Itens - |Taxas e Comissões| - Incentivo da Loja</code></li>
+                </ul>
+              </div>
+
+              <div class="doc-section">
+                <h4>🟠 Conciliação Oficial 99Food</h4>
+                <p>Na planilha de dados do pedido da 99Food (.xlsx), as colunas são normalizadas para o mesmo padrão:</p>
+                <ul>
+                  <li><strong>Preço Original do Item / Receita de Vendas:</strong> Valor bruto contratado no cardápio.</li>
+                  <li><strong>Despesas de Comissão + Taxas de Pagamento:</strong> Taxas de serviço da 99Food e custo de processamento online.</li>
+                  <li><strong>Despesas de Marketing + Custo de Entrega Grátis:</strong> Campanhas promocionais coparticipadas pela loja.</li>
+                  <li><strong>Fórmula:</strong> <code>Receita Real da Loja = Receita de Vendas - Comissões - Taxas Pgto - Marketing - Custo Frete Grátis</code></li>
+                </ul>
+              </div>
+
+              <div class="doc-section" style="grid-column: 1 / -1;">
+                <h4>💡 Fórmulas Globais de Indicadores</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 8px;">
+                  <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <strong>Taxa Efetiva Real (%):</strong><br>
+                    <code>((Faturamento Bruto - Líquido Recebido) / Faturamento Bruto) * 100</code>
+                  </div>
+                  <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <strong>Ticket Médio:</strong><br>
+                    <code>Faturamento Bruto / Quantidade Total de Pedidos Concluídos</code>
+                  </div>
+                  <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <strong>Margem Líquida Retida na Loja (%):</strong><br>
+                    <code>(Líquido Recebido / Faturamento Bruto) * 100</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABELA ANALÍTICA DE PEDIDOS CONCATENADOS -->
+        <div class="card">
+          <div class="card-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 class="card-title">Listagem Concatenada de Pedidos Delivery</h2>
+              <span class="card-subtitle">Exibição unificada de todos os pedidos 99Food e iFood com conciliação linha a linha</span>
+            </div>
+            <div style="font-size: 13px; color: #64748b; font-weight: 600;" id="tableCountSummary">
+              Exibindo 0 pedidos
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="concatenatedOrdersTable">
+              <thead>
+                <tr>
+                  <th>Canal</th>
+                  <th>ID Pedido</th>
+                  <th>Data e Hora</th>
+                  <th>Turno / Período</th>
+                  <th>Status</th>
+                  <th>Valor Bruto</th>
+                  <th>Descontos Loja</th>
+                  <th>Comissão / Taxas</th>
+                  <th>Líquido Recebido</th>
+                  <th>% Retenção</th>
+                </tr>
+              </thead>
+              <tbody id="concatenatedOrdersTableBody">
+                <tr><td colspan="10" class="text-center py-6 text-muted">Carregando pedidos concatenados...</td></tr>
+              </tbody>
+              <tfoot id="concatenatedOrdersTableFoot" style="font-weight: 800; background: #f8fafc; border-top: 2px solid var(--color-border);">
+                <!-- Preenchido dinamicamente com totais -->
+              </tfoot>
+            </table>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -1108,26 +1394,8 @@
   <!-- TOAST NOTIFICATIONS -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <!-- PONTO OS - AGENTS & INTELLIGENCE FRAMEWORK -->
-  <script src="ponto_os/core/permission_guard.js"></script>
-  <script src="ponto_os/core/memory_manager.js"></script>
-  <script src="ponto_os/core/tools_registry.js"></script>
-  <script src="ponto_os/agents/chef_cfo.js"></script>
-  <script src="ponto_os/agents/chef_estoque.js"></script>
-  <script src="ponto_os/agents/ponto_analytics.js"></script>
-  <script src="ponto_os/agents/chef_executivo.js"></script>
-  <script src="ponto_os/agents/ponto_operations.js"></script>
-  <script src="ponto_os/agents/ponto_catalogo.js"></script>
-  <script src="ponto_os/agents/ponto_marketing.js"></script>
-  <script src="ponto_os/agents/ponto_ads.js"></script>
-  <script src="ponto_os/agents/ponto_customer.js"></script>
-  <script src="ponto_os/agents/ponto_guardian.js"></script>
-  <script src="ponto_os/agents/ponto_master.js"></script>
-  <script src="ponto_os/gateway/ifood_gateway.js"></script>
-  <script src="ponto_os/ui/command_center.js"></script>
-  <script src="ponto_os/ui/approvals_center.js"></script>
-  <script src="ponto_os/ui/master_chat.js"></script>
-  <script src="ponto_os/ponto_os_app.js"></script>
+  <!-- DELIVERY REPORTS & RECONCILIATION -->
+  <script src="delivery_reports.js"></script>
 
   <!-- APPLICATION SCRIPT -->
   <script src="app.js"></script>

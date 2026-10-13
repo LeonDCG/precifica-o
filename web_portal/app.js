@@ -110,9 +110,7 @@ function switchView(viewId) {
     'quick-stock': { title: 'Estoque Rápido (+ / -)', subtitle: 'Painel visual de 2 colunas com botões rápidos de controle de estoque' },
     'simple-cakes': { title: 'Controle Direto de Bolos (Sem Ficha Técnica)', subtitle: 'Controle ágil e independente de bolos prontos para o balcão com botões rápidos (+ / -)' },
     sales: { title: 'Registro de Vendas', subtitle: 'Lançamento de vendas com baixa automática de estoque e cálculo de lucro' },
-    'ponto-command': { title: 'PONTO OS — Central de Comando', subtitle: 'Visão executiva integrada entre os 9 Agentes Especialistas da Doce & Ponto' },
-    'ponto-approvals': { title: 'PONTO OS — Central de Aprovações', subtitle: 'Governança humana e autorização de ações propostas pelos agentes de IA' },
-    'ponto-chat': { title: 'PONTO OS — Chat com PONTO MASTER', subtitle: 'Converse com o orquestrador geral inteligente da Doce & Ponto' },
+    reports: { title: 'Relatórios & Conciliação Delivery (99 & iFood)', subtitle: 'Concatenação automática, documentação analítica e métricas financeiras unificadas' },
   };
 
   const meta = titles[viewId] || titles.dashboard;
@@ -128,10 +126,8 @@ function switchView(viewId) {
     renderQuickStock(productsList);
   } else if (viewId === 'simple-cakes') {
     renderSimpleCakes(simpleCakesList);
-  } else if (viewId === 'ponto-command') {
-    window.pontoOS?.refreshCommandCenter();
-  } else if (viewId === 'ponto-approvals') {
-    window.pontoOS?.refreshApprovals();
+  } else if (viewId === 'reports') {
+    if (typeof renderReportsView === 'function') renderReportsView();
   }
 }
 
@@ -176,17 +172,9 @@ async function loadAllData() {
     populateProductSelects();
     loadSimpleCakes();
 
-    // Inicialização do PONTO OS (Inteligência dos Agentes)
-    if (window.initPontoOS) {
-      window.initPontoOS(supabaseClient).then(() => {
-        supabaseClient.from('agent_actions').select('id', { count: 'exact' }).eq('status', 'pending').then(({ count }) => {
-          const navBadge = document.getElementById('navApprovalBadge');
-          if (navBadge) {
-            navBadge.textContent = count || 0;
-            navBadge.style.display = (count && count > 0) ? 'inline-block' : 'none';
-          }
-        });
-      });
+    // Inicialização do Módulo de Relatórios Delivery (99Food & iFood)
+    if (typeof initDeliveryReports === 'function') {
+      initDeliveryReports();
     }
   } catch (error) {
     console.error('Erro ao carregar dados do Supabase:', error);
@@ -247,12 +235,29 @@ function renderDashboard() {
     return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
   });
 
-  const totalRev = monthSales.reduce((acc, s) => acc + (Number(s.totalvalue || s.totalValue) || 0), 0);
-  const totalNetProfit = monthSales.reduce((acc, s) => acc + (Number(s.netprofit || s.netProfit) || 0), 0);
+  // Métricas do Delivery Consolidado (99Food & iFood)
+  const delivMetrics = typeof getDeliveryDashboardMetrics === 'function' 
+    ? getDeliveryDashboardMetrics() 
+    : { totalGross: 0, totalNet: 0, totalOrders: 0, ifoodCount: 0, food99Count: 0 };
+
+  const totalRev = monthSales.reduce((acc, s) => acc + (Number(s.totalvalue || s.totalValue) || 0), 0) + delivMetrics.totalGross;
+  const totalNetProfit = monthSales.reduce((acc, s) => acc + (Number(s.netprofit || s.netProfit) || 0), 0) + delivMetrics.totalNet;
+  const totalOrdersCount = monthSales.length + delivMetrics.totalOrders;
 
   document.getElementById('dashTotalRevenue').textContent = hideValues ? 'R$ •••••' : formatBRL(totalRev);
   document.getElementById('dashNetProfit').textContent = hideValues ? 'R$ •••••' : formatBRL(totalNetProfit);
-  document.getElementById('dashTotalSales').textContent = hideValues ? '••' : monthSales.length;
+  document.getElementById('dashTotalSales').textContent = hideValues ? '••' : totalOrdersCount;
+
+  const revSubEl = document.getElementById('dashRevenueSub');
+  const salesSubEl = document.getElementById('dashSalesSub');
+  if (revSubEl) {
+    revSubEl.textContent = delivMetrics.totalGross > 0 
+      ? `Balcão: ${formatBRL(monthSales.reduce((a, s) => a + (Number(s.totalvalue || s.totalValue) || 0), 0))} | Delivery: ${formatBRL(delivMetrics.totalGross)}`
+      : 'Calculado em tempo real';
+  }
+  if (salesSubEl) {
+    salesSubEl.textContent = `Balcão (${monthSales.length}) + iFood (${delivMetrics.ifoodCount}) + 99Food (${delivMetrics.food99Count})`;
+  }
 
   const totalStockUnits = productsList.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
   document.getElementById('dashTotalStock').textContent = `${totalStockUnits} un`;
@@ -268,7 +273,12 @@ function renderDashboard() {
   } else {
     recentSalesBody.innerHTML = topSales.map(s => {
       const isIfood = (s.sellertype || s.sellerType || '').toLowerCase() === 'ifood';
-      const channelLabel = isIfood ? '<span class="badge-stock warning">iFood</span>' : '<span class="badge-stock ok">Balcão</span>';
+      const is99 = (s.sellertype || s.sellerType || '').toLowerCase() === '99food';
+      const channelLabel = isIfood 
+        ? '<span class="badge-stock warning" style="background:#fee2e2; color:#ea1d2c;">iFood</span>' 
+        : (is99 
+            ? '<span class="badge-stock warning" style="background:#ffedd5; color:#ea580c;">99Food</span>' 
+            : '<span class="badge-stock ok">Balcão</span>');
       return `
         <tr>
           <td>${formatDate(s.saledate || s.saleDate)}</td>
@@ -333,18 +343,27 @@ function renderCharts() {
     }
   });
 
-  // Gráfico de Canais
-  const ifoodCount = salesList.filter(s => (s.sellertype || s.sellerType || '').toLowerCase() === 'ifood').length;
-  const directCount = salesList.length - ifoodCount;
+  // Gráfico de Canais (Balcão, iFood, 99Food)
+  const delivMetrics = typeof getDeliveryDashboardMetrics === 'function' 
+    ? getDeliveryDashboardMetrics() 
+    : { ifoodCount: 0, food99Count: 0 };
+
+  const directCount = salesList.filter(s => {
+    const st = (s.sellertype || s.sellerType || '').toLowerCase();
+    return st !== 'ifood' && st !== '99food';
+  }).length;
+
+  const totalIfoodOrders = (salesList.filter(s => (s.sellertype || s.sellerType || '').toLowerCase() === 'ifood').length) + delivMetrics.ifoodCount;
+  const total99Orders = delivMetrics.food99Count;
 
   if (channelChartInstance) channelChartInstance.destroy();
   channelChartInstance = new Chart(chanCtx, {
     type: 'doughnut',
     data: {
-      labels: ['Venda Direta', 'iFood'],
+      labels: ['Balcão / Direto', 'iFood', '99Food'],
       datasets: [{
-        data: [directCount, ifoodCount],
-        backgroundColor: ['#0f4c81', '#ea1d2c'],
+        data: [directCount, totalIfoodOrders, total99Orders],
+        backgroundColor: ['#0f4c81', '#ea1d2c', '#f97316'],
         borderWidth: 2
       }]
     },
