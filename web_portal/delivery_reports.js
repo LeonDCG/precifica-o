@@ -1076,7 +1076,7 @@ function renderReportsView() {
   setText('repTotalOrdersCount', totOrders);
   setText('repTotalItemsCount', `${totItems} itens vendidos no delivery`);
   setText('repEffectiveCommissionPct', `Taxa média retida: ${effectiveCommPct.toFixed(1)}%`);
-  setText('repEffectiveMarginPct', `Margem líquida das plataformas: ${effectiveMarginPct.toFixed(1)}%`);
+  setText('repEffectiveMarginPct', `Repasse das operadoras: ${effectiveMarginPct.toFixed(1)}% do faturamento`);
   setText('repTicketMedio', `Ticket Médio: ${formatBRL(ticketMedio)}`);
 
   // Subtítulo do cabeçalho de período

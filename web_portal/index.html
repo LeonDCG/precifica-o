@@ -522,6 +522,29 @@
 
       <!-- VIEW: RELATÓRIOS E CONCILIAÇÃO DELIVERY (99FOOD & IFOOD) -->
       <section id="view-reports" class="content-view">
+        <!-- BANNER DE IDENTIFICAÇÃO DA VISÃO 1 (RELATÓRIOS OFICIAIS DAS PLATAFORMAS) -->
+        <div class="card" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1.5px solid #bae6fd; padding: 16px 20px; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <span style="font-size: 28px;">📊</span>
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                  <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #0369a1;">Visão 1: Relatório & Faturamento Oficial das Plataformas (99Food & iFood)</h3>
+                  <span style="background: #0284c7; color: #fff; font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: var(--radius-pill); text-transform: uppercase;">100% Espelho das Planilhas</span>
+                </div>
+                <p style="margin: 4px 0 0 0; font-size: 13px; color: #0369a1; line-height: 1.45;">
+                  Exibição pura e direta dos valores apurados pelas operadoras. O <strong>Líquido Recebido</strong> reflete estritamente a coluna destacada em amarelo no relatório do iFood (<em>"VALOR LÍQUIDO (R$)"</em>) e a <em>"Receita real da loja"</em> da 99Food, sem misturar custos internos de produção/ingredientes.
+                </p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 12px; font-weight: 700; color: #0284c7; background: #ffffff; padding: 6px 12px; border-radius: 6px; border: 1px solid #bae6fd;">
+                Depósito Bancário das Plataformas
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- BARRA SUPERIOR DE CONTROLES DO MÓDULO -->
         <div class="reports-top-bar">
           <div class="search-box" style="max-width: 380px;">
@@ -618,7 +641,7 @@
 
           <div class="stat-card">
             <div class="stat-header">
-              <span class="stat-label">LÍQUIDO REAL RECEBIDO</span>
+              <span class="stat-label">REPASSE LÍQUIDO PLATAFORMAS</span>
               <span class="stat-badge green">Depositado</span>
             </div>
             <div class="stat-value text-green" id="repTotalNet">R$ 0,00</div>
@@ -673,7 +696,7 @@
                 <strong class="kpi-value" id="ifoodGrossVal">R$ 0,00</strong>
               </div>
               <div class="platform-kpi">
-                <span class="kpi-label">Valor Líquido Recebido:</span>
+                <span class="kpi-label">Valor Líquido (Coluna Amarela):</span>
                 <strong class="kpi-value text-green" id="ifoodNetVal">R$ 0,00</strong>
               </div>
               <div class="platform-kpi">
@@ -719,7 +742,7 @@
                 <strong class="kpi-value" id="food99GrossVal">R$ 0,00</strong>
               </div>
               <div class="platform-kpi">
-                <span class="kpi-label">Valor Líquido Recebido:</span>
+                <span class="kpi-label">Receita Real Loja (Líquido):</span>
                 <strong class="kpi-value text-green" id="food99NetVal">R$ 0,00</strong>
               </div>
               <div class="platform-kpi">
