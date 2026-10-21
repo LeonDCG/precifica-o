@@ -476,11 +476,12 @@ async function saveIngredient(e) {
   try {
     if (id) {
       await supabaseClient.from('ingredients').update(payload).eq('id', id);
-      showToast('Ingrediente atualizado com sucesso!', 'success');
+      showToast('Ingrediente atualizado! Custo dos produtos recalculado automaticamente.', 'success');
     } else {
       await supabaseClient.from('ingredients').insert([payload]);
       showToast('Ingrediente cadastrado com sucesso!', 'success');
     }
+    try { await supabaseClient.rpc('recalculate_all_costs'); } catch(e){}
     closeModal('ingredientModal');
     await loadAllData();
   } catch (error) {
@@ -1028,11 +1029,11 @@ function getProductRecipesDetails(prodId) {
   return links.map(link => {
     const rec = recipesList.find(r => r.id === (link.recipeid || link.recipeId));
     const qty = Number(link.quantityused) || 1;
-    let cost = 0;
-    if (link.cost && Number(link.cost) > 0) {
+    const liveCost = rec ? getRecipeTotalCost(rec) : 0;
+    if (liveCost > 0) {
+      cost = liveCost * qty;
+    } else if (link.cost && Number(link.cost) > 0) {
       cost = Number(link.cost);
-    } else if (rec) {
-      cost = getRecipeTotalCost(rec) * qty;
     }
     return {
       recipeId: link.recipeid || link.recipeId,
@@ -1157,6 +1158,7 @@ function renderProductsCatalogGrid(list) {
       const totalBatchCost = unitCost * yieldAmt;
       const sellPrice = Number(prod.sellPrice) || 0;
       const ifoodPrice = Number(prod.ifoodPrice) || 0;
+      const food99Price = Number(prod.food99Price || prod.food99price) || 0;
 
       const profitTotal = sellPrice - totalBatchCost;
       const profitPerUnit = yieldAmt > 0 ? (profitTotal / yieldAmt) : profitTotal;
@@ -1242,9 +1244,17 @@ function renderProductsCatalogGrid(list) {
 
               ${ifoodPrice > 0 ? `
                 <div class="catalog-price-block" style="text-align: right;">
-                  <span class="catalog-price-label" style="color: #ea1d2c;">iFood</span>
+                  <span class="catalog-price-label" style="color: #ea1d2c;">🔴 iFood</span>
                   <span class="catalog-price-val ifood">${formatBRL(ifoodPrice)}</span>
                   ${yieldAmt > 1 ? `<span style="font-size:11px; color:#ea1d2c;">${formatBRL(ifoodPrice / yieldAmt)} por ${unitName}</span>` : ''}
+                </div>
+              ` : ''}
+
+              ${food99Price > 0 ? `
+                <div class="catalog-price-block" style="text-align: right;">
+                  <span class="catalog-price-label" style="color: #ea580c;">🟠 99Food</span>
+                  <span class="catalog-price-val" style="color: #ea580c; font-weight:700;">${formatBRL(food99Price)}</span>
+                  ${yieldAmt > 1 ? `<span style="font-size:11px; color:#ea580c;">${formatBRL(food99Price / yieldAmt)} por ${unitName}</span>` : ''}
                 </div>
               ` : ''}
             </div>
@@ -1312,6 +1322,7 @@ function renderProductsTable(list) {
         <td><span class="stat-badge blue">${escapeHtml(prod.category || 'Geral')}</span></td>
         <td><strong>${formatBRL(prod.sellPrice)}</strong></td>
         <td><span style="color:#ea1d2c; font-weight:700;">${prod.ifoodPrice > 0 ? formatBRL(prod.ifoodPrice) : '-'}</span></td>
+        <td><span style="color:#ea580c; font-weight:700;">${(prod.food99Price || prod.food99price) > 0 ? formatBRL(prod.food99Price || prod.food99price) : '-'}</span></td>
         <td class="text-green font-bold">${formatBRL(prodUnitCost)} / ${escapeHtml(prod.unit || 'un')}</td>
         <td><span class="badge-stock ${badgeClass}">${stock} ${prod.unit || 'un'}</span></td>
         <td>${minStock} ${prod.unit || 'un'}</td>
@@ -1707,10 +1718,12 @@ function renderSimpleCakes(list = simpleCakesList) {
               <div class="quick-prod-name" style="color: ${theme.text};">
                 ${escapeHtml(cake.name)}
               </div>
-              <div class="quick-prod-details">
+              <div class="quick-prod-details" style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px;">
                 <span class="quick-detail-tag" style="background:${theme.badgeBg}; color:${theme.badgeText}; border: 1px solid ${theme.border}40;">
                   ${escapeHtml(cake.category || 'Bolo Simples')}
                 </span>
+                ${cake.ifood_price > 0 ? `<span class="quick-detail-tag" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-weight: 700;">🔴 iFood: ${formatBRL(cake.ifood_price)}</span>` : ''}
+                ${cake.food99_price > 0 ? `<span class="quick-detail-tag" style="background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; font-weight: 700;">🟠 99Food: ${formatBRL(cake.food99_price)}</span>` : ''}
                 ${cake.notes ? `<span class="simple-cake-notes" style="font-size: 13px; color: #64748b; font-style: italic;">📝 ${escapeHtml(cake.notes)}</span>` : ''}
                 <span id="simple-cake-badge-${cake.id}">${alertBadgeHtml}</span>
               </div>
@@ -1865,12 +1878,16 @@ function openSimpleCakeModal(cakeId = null) {
     document.getElementById('simpleCakeQty').value = cake.quantity ?? 0;
     document.getElementById('simpleCakeCategory').value = cake.category || 'Bolo Caseiro';
     document.getElementById('simpleCakeNotes').value = cake.notes || '';
+    document.getElementById('simpleCakeIfoodPrice').value = cake && cake.ifood_price ? cake.ifood_price : '';
+    document.getElementById('simpleCakeFood99Price').value = cake && cake.food99_price ? cake.food99_price : '';
   } else {
     title.textContent = 'Cadastrar Novo Bolo (Controle Rápido)';
     document.getElementById('simpleCakeId').value = '';
     document.getElementById('simpleCakeQty').value = '1';
     document.getElementById('simpleCakeCategory').value = 'Bolo Caseiro';
     document.getElementById('simpleCakeNotes').value = '';
+    document.getElementById('simpleCakeIfoodPrice').value = '';
+    document.getElementById('simpleCakeFood99Price').value = '';
   }
 
   openModal('simpleCakeModal');
@@ -1888,6 +1905,8 @@ async function saveSimpleCake(event) {
   const quantity = Math.max(0, parseInt(document.getElementById('simpleCakeQty')?.value || '0', 10) || 0);
   const category = document.getElementById('simpleCakeCategory')?.value?.trim() || 'Bolo Caseiro';
   const notes = document.getElementById('simpleCakeNotes')?.value?.trim() || '';
+  const ifood_price = parseFloat(document.getElementById('simpleCakeIfoodPrice')?.value || '0') || 0;
+  const food99_price = parseFloat(document.getElementById('simpleCakeFood99Price')?.value || '0') || 0;
 
   if (!name) {
     showToast('Informe o nome do bolo.', 'warning');
@@ -1899,6 +1918,8 @@ async function saveSimpleCake(event) {
     quantity,
     category,
     notes,
+    ifood_price,
+    food99_price,
     updated_at: new Date().toISOString()
   };
 
@@ -2354,6 +2375,21 @@ function calcProductFullPricing() {
     }
   }
 
+  // 6.1 Preço 99Food sugerido (taxa 18%)
+  const food99Help = document.getElementById('previewFood99SuggestedHelp');
+  if (food99Help) {
+    if (sellPriceVal > 0) {
+      const suggestedFood99 = sellPriceVal / (1 - 0.18);
+      food99Help.textContent = `Sugerido 99Food (taxa 18%): ${formatBRL(suggestedFood99)}`;
+      const food99Input = document.getElementById('prodFood99Price');
+      if (food99Input && (!food99Input.value || parseFloat(food99Input.value) === 0)) {
+        food99Input.value = suggestedFood99.toFixed(2);
+      }
+    } else {
+      food99Help.textContent = `Sugerido 99Food (taxa 18%): R$ 0,00`;
+    }
+  }
+
   // 7. Lucro projetado real (positivo ou negativo)
   const realProfitBatch = sellPriceVal - totalBatchCost;
   const realProfitUnit = yieldAmt > 0 ? (realProfitBatch / yieldAmt) : realProfitBatch;
@@ -2390,6 +2426,7 @@ function openProductModal(prodId = null) {
   document.getElementById('prodMargin').value = prod ? (prod.profitMarginPercent || 30) : 30;
   document.getElementById('prodSellPrice').value = prod && prod.sellPrice ? prod.sellPrice : '';
   document.getElementById('prodIfoodPrice').value = prod && prod.ifoodPrice ? prod.ifoodPrice : '';
+  document.getElementById('prodFood99Price').value = prod && (prod.food99Price || prod.food99price) ? (prod.food99Price || prod.food99price) : '';
   document.getElementById('prodStock').value = prod ? (prod.stock || 0) : 0;
   document.getElementById('prodMinStock').value = prod ? (prod.minStock || 5) : 5;
 
@@ -2463,6 +2500,7 @@ async function saveProduct(e) {
   const margin = parseFloat(document.getElementById('prodMargin').value) || 30;
   const sellPrice = parseFloat(document.getElementById('prodSellPrice').value) || 0;
   const ifoodPrice = parseFloat(document.getElementById('prodIfoodPrice').value) || 0;
+  const food99Price = parseFloat(document.getElementById('prodFood99Price').value) || 0;
   const stock = parseFloat(document.getElementById('prodStock').value) || 0;
   const minStock = parseFloat(document.getElementById('prodMinStock').value) || 0;
   const unit = document.getElementById('prodUnit').value.trim() || 'fatia';
@@ -2527,6 +2565,7 @@ async function saveProduct(e) {
     suggestedPrice,
     sellPrice,
     ifoodPrice,
+    food99Price,
     stock,
     minStock,
     isFeatured,

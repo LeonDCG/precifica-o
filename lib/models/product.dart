@@ -5,6 +5,7 @@ class Product {
   double sellPrice;
   double profitMarginPercent;
   double ifoodPrice; // Preço de venda praticado no iFood
+  double food99Price; // Preço de venda praticado no 99Food
   
   String imagePath; // Caminho da imagem local ou asset
   bool isFeatured; // Se é destaque
@@ -22,6 +23,7 @@ class Product {
     this.sellPrice = 0,
     this.profitMarginPercent = 30.0,
     this.ifoodPrice = 0.0,
+    this.food99Price = 0.0,
     this.imagePath = '',
     this.isFeatured = false,
     this.category = 'Geral',
@@ -32,6 +34,7 @@ class Product {
   });
 
   double get effectiveIfoodPrice => ifoodPrice > 0 ? ifoodPrice : sellPrice;
+  double get effectiveFood99Price => food99Price > 0 ? food99Price : sellPrice;
 
   double get totalCost {
     double sum = 0;
@@ -61,6 +64,7 @@ class Product {
       'suggestedPrice': suggestedPrice,
       'sellPrice': sellPrice,
       'ifoodPrice': ifoodPrice,
+      'food99Price': food99Price,
       'profitMarginPercent': profitMarginPercent,
       'imagePath': imagePath,
       'isFeatured': isFeatured ? 1 : 0,
@@ -78,6 +82,7 @@ class Product {
       sellPrice: ((map['sellPrice'] ?? map['sellprice'] ?? 0.0) as num).toDouble(),
       profitMarginPercent: ((map['profitMarginPercent'] ?? map['profitmarginpercent'] ?? 30.0) as num).toDouble(),
       ifoodPrice: ((map['ifoodPrice'] ?? map['ifoodprice'] ?? 0.0) as num).toDouble(),
+      food99Price: ((map['food99Price'] ?? map['food99price'] ?? 0.0) as num).toDouble(),
       imagePath: map['imagePath'] ?? map['imagepath'] ?? '',
       isFeatured: (map['isFeatured'] ?? map['isfeatured'] ?? 0) == 1,
       category: map['category'] ?? 'Geral',

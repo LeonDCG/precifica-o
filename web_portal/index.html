@@ -357,6 +357,7 @@
                     <th>Categoria</th>
                     <th>Preço Balcão</th>
                     <th>Preço iFood</th>
+                    <th>Preço 99Food</th>
                     <th>Custo Prod.</th>
                     <th>Estoque Atual</th>
                     <th>Estoque Mín.</th>
@@ -365,7 +366,7 @@
                   </tr>
                 </thead>
                 <tbody id="productsTableBody">
-                  <tr><td colspan="9" class="text-center py-4">Carregando produtos e estoque...</td></tr>
+                  <tr><td colspan="10" class="text-center py-4">Carregando produtos e estoque...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1213,14 +1214,19 @@
               <div class="pricing-step-header">C. Preços de Venda Praticados</div>
               <div class="form-row">
                 <div class="form-group">
-                  <label class="form-label">Preço de Venda Balcão (Total R$) *</label>
+                  <label class="form-label">Preço Balcão (Total R$) *</label>
                   <input type="number" step="0.01" id="prodSellPrice" class="form-input" placeholder="0,00" required oninput="calcProductFullPricing()">
                   <div class="form-helper-text" id="previewSellPricePerUnitHelp">Venda por fatia: R$ 0,00</div>
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Preço de Venda iFood (R$)</label>
-                  <input type="number" step="0.01" id="prodIfoodPrice" class="form-input" placeholder="Ex: 22,99" oninput="calcProductFullPricing()">
+                  <label class="form-label" style="color: #ea1d2c; font-weight: 700;">Preço iFood (R$)</label>
+                  <input type="number" step="0.01" id="prodIfoodPrice" class="form-input" placeholder="Ex: 23,99" oninput="calcProductFullPricing()">
                   <div class="form-helper-text" id="previewIfoodSuggestedHelp" style="color: #ea1d2c;">Sugerido iFood (taxa 23%): R$ 0,00</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="color: #ea580c; font-weight: 700;">Preço 99Food (R$)</label>
+                  <input type="number" step="0.01" id="prodFood99Price" class="form-input" placeholder="Ex: 24,99" oninput="calcProductFullPricing()">
+                  <div class="form-helper-text" id="previewFood99SuggestedHelp" style="color: #ea580c;">Sugerido 99Food (taxa 18%): R$ 0,00</div>
                 </div>
               </div>
             </div>
@@ -1462,6 +1468,21 @@
                 <option value="Bolo de Pote">
                 <option value="Torta Doce">
               </datalist>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 18px;">
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 700; color: #ea1d2c; display: flex; align-items: center; gap: 4px;">
+                <span>🔴 Preço iFood (R$)</span>
+              </label>
+              <input type="number" step="0.01" min="0" id="simpleCakeIfoodPrice" class="form-input" placeholder="Ex: 23,99" style="font-size: 16px; font-weight: 700;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-weight: 700; color: #ea580c; display: flex; align-items: center; gap: 4px;">
+                <span>🟠 Preço 99Food (R$)</span>
+              </label>
+              <input type="number" step="0.01" min="0" id="simpleCakeFood99Price" class="form-input" placeholder="Ex: 24,99" style="font-size: 16px; font-weight: 700;">
             </div>
           </div>
 
