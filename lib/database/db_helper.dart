@@ -8,6 +8,7 @@ import '../models/sale.dart';
 import '../models/refrigerator_item.dart';
 import '../models/profile.dart';
 import '../models/order_request.dart';
+import '../models/simple_cake.dart';
 
 class DatabaseHelper {
   static const String supabaseUrl = 'https://jfpswioaikpflvjiylqa.supabase.co';
@@ -33,6 +34,7 @@ class DatabaseHelper {
   List<Sale>? _cachedSales;
   final Map<String, List<Sale>> _cachedSellerSales = {};
   List<RefrigeratorItem>? _cachedStock;
+  List<SimpleCake>? _cachedSimpleCakes;
 
   // Getters para renderização instantânea (Stale-While-Revalidate)
   List<Ingredient>? get cachedIngredients => _cachedIngredients;
@@ -42,6 +44,7 @@ class DatabaseHelper {
   List<Sale>? get cachedSales => _cachedSales;
   List<Sale>? getCachedSellerSales(String sellerName) => _cachedSellerSales[sellerName.trim().toLowerCase()];
   List<RefrigeratorItem>? get cachedStock => _cachedStock;
+  List<SimpleCake>? get cachedSimpleCakes => _cachedSimpleCakes;
   Map<String, String>? get cachedSettings => _cachedSettings;
 
   // Futures em voo para desduplicar requisições concorrentes
@@ -53,6 +56,7 @@ class DatabaseHelper {
   Future<Map<String, String>>? _inFlightSettings;
   Future<List<Sale>>? _inFlightSales;
   Future<List<RefrigeratorItem>>? _inFlightStock;
+  Future<List<SimpleCake>>? _inFlightSimpleCakes;
 
   void clearAllCache() {
     _cachedIngredients = null;
@@ -67,6 +71,7 @@ class DatabaseHelper {
     _cachedSellerSales.clear();
     _cachedStock = null;
     _cachedProfile = null;
+    _cachedSimpleCakes = null;
   }
 
   void clearProductsCache() {
@@ -952,6 +957,85 @@ class DatabaseHelper {
       }
     } catch (e) {
       debugPrint('Erro ao entregar pedido: $e');
+    }
+  }
+
+  // ==========================================
+  // CONTROLE DIRETO DE BOLOS (SEM FICHA TÉCNICA)
+  // ==========================================
+  Future<List<SimpleCake>> readSimpleCakes({bool forceRefresh = false}) async {
+    if (!forceRefresh && _cachedSimpleCakes != null) {
+      return _cachedSimpleCakes!;
+    }
+    if (_inFlightSimpleCakes != null) {
+      return _inFlightSimpleCakes!;
+    }
+
+    _inFlightSimpleCakes = _fetchSimpleCakes();
+    try {
+      final res = await _inFlightSimpleCakes!;
+      _cachedSimpleCakes = res;
+      return res;
+    } finally {
+      _inFlightSimpleCakes = null;
+    }
+  }
+
+  Future<List<SimpleCake>> _fetchSimpleCakes() async {
+    final response = await _client
+        .from('simple_cakes')
+        .select()
+        .order('name', ascending: true);
+    return response.map<SimpleCake>((json) => SimpleCake.fromMap(json)).toList();
+  }
+
+  Stream<List<SimpleCake>> streamSimpleCakes() {
+    return _client
+        .from('simple_cakes')
+        .stream(primaryKey: ['id'])
+        .order('name', ascending: true)
+        .map((maps) {
+          final list = maps.map((json) => SimpleCake.fromMap(json)).toList();
+          _cachedSimpleCakes = list;
+          return list;
+        });
+  }
+
+  Future<void> updateSimpleCakeQuantity(int id, int newQty) async {
+    final qty = newQty < 0 ? 0 : newQty;
+    await _client.from('simple_cakes').update({
+      'quantity': qty,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', id);
+
+    if (_cachedSimpleCakes != null) {
+      final idx = _cachedSimpleCakes!.indexWhere((c) => c.id == id);
+      if (idx != -1) {
+        _cachedSimpleCakes![idx] = _cachedSimpleCakes![idx].copyWith(quantity: qty);
+      }
+    }
+  }
+
+  Future<SimpleCake> createSimpleCake(SimpleCake cake) async {
+    var data = cake.toMap();
+    data.remove('id');
+    final response = await _client.from('simple_cakes').insert(data).select().single();
+    _cachedSimpleCakes = null;
+    return SimpleCake.fromMap(response);
+  }
+
+  Future<void> updateSimpleCake(SimpleCake cake) async {
+    if (cake.id == null) return;
+    var data = cake.toMap();
+    data.remove('id');
+    await _client.from('simple_cakes').update(data).eq('id', cake.id!);
+    _cachedSimpleCakes = null;
+  }
+
+  Future<void> deleteSimpleCake(int id) async {
+    await _client.from('simple_cakes').delete().eq('id', id);
+    if (_cachedSimpleCakes != null) {
+      _cachedSimpleCakes!.removeWhere((c) => c.id == id);
     }
   }
 }

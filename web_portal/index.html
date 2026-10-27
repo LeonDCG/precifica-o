@@ -16,22 +16,20 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-  <!-- BARREIRA DE ACESSO EXCLUSIVO COMPUTADOR (DESKTOP/NOTEBOOK) -->
-  <div id="mobileBlocker" class="mobile-blocker-overlay" style="display: none;">
-    <div class="mobile-blocker-card">
-      <div class="blocker-icon">💻</div>
-      <h2>Acesso Exclusivo para Computador</h2>
-      <p>O <strong>Painel Web Doce & Ponto</strong> foi planejado e otimizado especificamente para telas de <strong>Desktop ou Notebook</strong> (largura recomendada a partir de 1024px).</p>
-      <div class="blocker-alert">
-        <span class="blocker-alert-icon">📱</span>
-        <div>Para lançamentos rápidos e uso no balcão pelo celular, utilize o aplicativo mobile instalado.</div>
-      </div>
-      <p class="blocker-sub">Abra este link no navegador do seu computador para utilizar o controle de estoque completo, fichas técnicas de receitas, cadastro de insumos e relatórios de lucratividade.</p>
-      <button type="button" class="btn btn-secondary" onclick="document.getElementById('mobileBlocker').style.display='none'">
-        Continuar mesmo assim (Modo Visualização)
-      </button>
+  <!-- CABEÇALHO MOBILE (RESPONSIVO PARA CELULAR E TABLET) -->
+  <header class="mobile-header">
+    <button type="button" id="mobileMenuToggle" class="btn-mobile-menu" aria-label="Abrir Menu Lateral">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="mobile-brand">
+      <span class="brand-icon">🍰</span>
+      <span class="brand-title">DOCE & PONTO</span>
     </div>
-  </div>
+    <button type="button" class="btn-mobile-quick-action" onclick="switchView('simple-cakes')" title="Acesso Rápido: Controle Direto de Bolos">
+      🎂 <span>Bolos</span>
+    </button>
+  </header>
+  <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 
   <div class="app-layout">
     <!-- SIDEBAR -->
@@ -42,6 +40,7 @@
           <span class="brand-title">DOCE & PONTO</span>
           <span class="brand-badge">PAINEL WEB PRO</span>
         </div>
+        <button type="button" class="btn-close-sidebar-mobile" onclick="closeMobileSidebar()" aria-label="Fechar menu">✕</button>
       </div>
 
       <nav class="nav-menu">
@@ -464,6 +463,22 @@
 
       <!-- VIEW: CONTROLE DIRETO DE BOLOS (SEM RECEITAS/FICHAS - 2 COLUNAS DIRETO) -->
       <section id="view-simple-cakes" class="content-view">
+        <!-- BANNER DE SINCRONIZAÇÃO EM NUVEM (SUPABASE REALTIME) -->
+        <div class="simple-cakes-cloud-banner">
+          <div class="cloud-status-left">
+            <div id="simpleCakesSyncStatus" class="simple-cakes-sync-badge sync-live">
+              <span class="sync-dot live"></span> Sincronizado em Nuvem (Supabase Tempo Real)
+            </div>
+            <span class="cloud-info-text">Todas as alterações (+ / -) gravam no banco instantaneamente e sincronizam em qualquer celular, tablet ou PC.</span>
+          </div>
+          <div class="cloud-status-right">
+            <button class="btn btn-sm btn-cloud-reload" onclick="loadSimpleCakes()" title="Recarregar dados do banco agora">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Recarregar Nuvem</span>
+            </button>
+          </div>
+        </div>
+
         <!-- BARRA SUPERIOR DO CONTROLE DIRETO DE BOLOS -->
         <div class="quick-stock-top-bar simple-cakes-top-bar">
           <div class="search-box quick-stock-search">
@@ -1560,6 +1575,6 @@
   <script src="delivery_reports.js?v=20261026_v5"></script>
 
   <!-- APPLICATION SCRIPT -->
-  <script src="app.js?v=20261026_v5"></script>
+  <script src="app.js?v=20261027_v6"></script>
 </body>
 </html>

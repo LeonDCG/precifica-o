@@ -71,15 +71,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadAllData();
 });
 
-// RESTRIÇÃO DE DISPOSITIVO: EXCLUSIVO PARA COMPUTADOR (DESKTOP/NOTEBOOK)
+// CONTROLE DE DISPOSITIVOS: ACESSO MULTI-DISPOSITIVO (MOBILE, TABLET E COMPUTADOR)
 function checkDeviceRestriction() {
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 1024;
   const blocker = document.getElementById('mobileBlocker');
-  if (isMobile && blocker) {
-    blocker.style.display = 'flex';
+  if (blocker) {
+    blocker.style.display = 'none';
   }
 }
 
+function toggleMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (sidebar) sidebar.classList.toggle('open');
+  if (backdrop) backdrop.classList.toggle('active');
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (sidebar) sidebar.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('active');
+}
 
 // NAVEGAÇÃO ENTRE TELAS (SIDEBAR)
 function setupNavigation() {
@@ -88,8 +100,14 @@ function setupNavigation() {
     item.addEventListener('click', () => {
       const viewId = item.getAttribute('data-view');
       switchView(viewId);
+      closeMobileSidebar();
     });
   });
+
+  const toggleBtn = document.getElementById('mobileMenuToggle');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', toggleMobileSidebar);
+  }
 }
 
 function switchView(viewId) {
@@ -126,6 +144,7 @@ function switchView(viewId) {
     renderQuickStock(productsList);
   } else if (viewId === 'simple-cakes') {
     renderSimpleCakes(simpleCakesList);
+    loadSimpleCakes(); // Atualiza em background sempre que a tela for aberta
   } else if (viewId === 'reports') {
     if (typeof renderReportsView === 'function') renderReportsView();
   }
@@ -171,6 +190,7 @@ async function loadAllData() {
     updateStockAlerts();
     populateProductSelects();
     loadSimpleCakes();
+    setupSimpleCakesRealtime();
 
     // Inicialização do Módulo de Relatórios Delivery (99Food & iFood)
     if (typeof initDeliveryReports === 'function') {
@@ -1619,8 +1639,9 @@ function getCakeTheme(name, index) {
 }
 
 async function loadSimpleCakes() {
+  const statusEl = document.getElementById('simpleCakesSyncStatus');
   try {
-    // 1. Carregamento imediato do cache local
+    // 1. Carregamento imediato do cache local para resposta visual instantânea (0ms)
     const cached = localStorage.getItem('simple_cakes_cache');
     if (cached) {
       try {
@@ -1634,7 +1655,7 @@ async function loadSimpleCakes() {
       }
     }
 
-    // 2. Sincronização com Supabase (tabela simple_cakes)
+    // 2. Sincronização direta com a tabela simple_cakes no Supabase
     const { data, error } = await supabaseClient
       .from('simple_cakes')
       .select('*')
@@ -1647,9 +1668,23 @@ async function loadSimpleCakes() {
       if (document.getElementById('view-simple-cakes')?.classList.contains('active')) {
         renderSimpleCakes(simpleCakesList);
       }
+      if (statusEl) {
+        statusEl.innerHTML = '<span class="sync-dot live"></span> Sincronizado em Nuvem (Supabase Tempo Real)';
+        statusEl.className = 'simple-cakes-sync-badge sync-live';
+      }
+    } else if (error) {
+      console.warn('Erro ao consultar simple_cakes no Supabase:', error);
+      if (statusEl) {
+        statusEl.innerHTML = '<span class="sync-dot"></span> Sincronizado Localmente (Cache)';
+        statusEl.className = 'simple-cakes-sync-badge';
+      }
     }
   } catch (err) {
     console.warn('Conexão offline ou pendente para bolos simples:', err);
+    if (statusEl) {
+      statusEl.innerHTML = '<span class="sync-dot"></span> Modo Offline';
+      statusEl.className = 'simple-cakes-sync-badge';
+    }
   }
 }
 
@@ -1832,16 +1867,19 @@ async function adjustSimpleCakeQty(cakeId, delta) {
 
   updateSimpleCakesStats();
   localStorage.setItem('simple_cakes_cache', JSON.stringify(simpleCakesList));
-  showToast(`Bolo "${cake.name}": ${newQty} un`, 'info', 1400);
+  showToast(`Bolo "${cake.name}": ${newQty} un (Salvo no Banco)`, 'info', 1400);
 
-  // 2. Sincronização em background no Supabase
+  // 2. Gravação no Supabase (Nuvem)
   try {
-    await supabaseClient
+    const { error } = await supabaseClient
       .from('simple_cakes')
       .update({ quantity: newQty, updated_at: new Date().toISOString() })
       .eq('id', cake.id);
+
+    if (error) throw error;
   } catch (err) {
-    console.warn('Erro ao atualizar quantidade no Supabase:', err);
+    console.error('Erro ao atualizar quantidade no Supabase:', err);
+    showToast('Aviso: Falha ao sincronizar com banco em nuvem.', 'warning');
   }
 }
 
@@ -1953,11 +1991,12 @@ async function saveSimpleCake(event) {
       simpleCakesList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       renderSimpleCakes(simpleCakesList);
       closeModal('simpleCakeModal');
-      showToast(`Bolo "${name}" cadastrado com sucesso!`, 'success');
+      showToast(`Bolo "${name}" cadastrado e salvo no banco!`, 'success');
 
+      // Gravação completa de todos os campos no Supabase
       const { data, error } = await supabaseClient
         .from('simple_cakes')
-        .insert([{ name, quantity, category, notes }])
+        .insert([payload])
         .select();
 
       if (error) throw error;
@@ -1972,7 +2011,8 @@ async function saveSimpleCake(event) {
     localStorage.setItem('simple_cakes_cache', JSON.stringify(simpleCakesList));
     renderSimpleCakes(simpleCakesList);
   } catch (err) {
-    console.warn('Erro ao salvar bolo no Supabase, mantendo cache local:', err);
+    console.error('Erro ao salvar bolo no Supabase:', err);
+    showToast(`Erro ao sincronizar com banco: ${err.message || 'Verifique conexão'}`, 'error');
     localStorage.setItem('simple_cakes_cache', JSON.stringify(simpleCakesList));
     renderSimpleCakes(simpleCakesList);
   }
@@ -1993,12 +2033,68 @@ async function deleteSimpleCake(cakeId) {
   showToast(`Bolo "${cake.name}" excluído.`, 'info');
 
   try {
-    await supabaseClient
+    const { error } = await supabaseClient
       .from('simple_cakes')
       .delete()
       .eq('id', cakeId);
+
+    if (error) throw error;
   } catch (err) {
     console.error('Erro ao excluir bolo no Supabase:', err);
+    showToast('Erro ao excluir no banco de dados.', 'error');
+  }
+}
+
+// SINCRONIZAÇÃO EM TEMPO REAL (SUPABASE REALTIME) ENTRE TODOS OS DISPOSITIVOS
+let simpleCakesRealtimeChannel = null;
+
+function setupSimpleCakesRealtime() {
+  if (!supabaseClient || simpleCakesRealtimeChannel) return;
+
+  try {
+    simpleCakesRealtimeChannel = supabaseClient
+      .channel('simple_cakes_realtime_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'simple_cakes' }, (payload) => {
+        console.log('[Realtime Cloud] Atualização detectada em simple_cakes:', payload.eventType, payload);
+
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const idx = simpleCakesList.findIndex(c => c.id === payload.new.id);
+          if (idx === -1) {
+            simpleCakesList.push(payload.new);
+            simpleCakesList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          } else {
+            simpleCakesList[idx] = payload.new;
+          }
+        } else if (payload.eventType === 'UPDATE' && payload.new) {
+          const idx = simpleCakesList.findIndex(c => c.id === payload.new.id);
+          if (idx !== -1) {
+            simpleCakesList[idx] = payload.new;
+          } else {
+            simpleCakesList.push(payload.new);
+            simpleCakesList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          }
+        } else if (payload.eventType === 'DELETE' && payload.old) {
+          simpleCakesList = simpleCakesList.filter(c => c.id !== payload.old.id);
+        }
+
+        localStorage.setItem('simple_cakes_cache', JSON.stringify(simpleCakesList));
+        updateSimpleCakesStats();
+        if (document.getElementById('view-simple-cakes')?.classList.contains('active')) {
+          renderSimpleCakes(simpleCakesList);
+        }
+      })
+      .subscribe((status) => {
+        console.log('[Realtime Cloud] Status do canal simple_cakes:', status);
+        const statusEl = document.getElementById('simpleCakesSyncStatus');
+        if (statusEl) {
+          if (status === 'SUBSCRIBED') {
+            statusEl.innerHTML = '<span class="sync-dot live"></span> Sincronizado em Nuvem (Supabase Tempo Real)';
+            statusEl.className = 'simple-cakes-sync-badge sync-live';
+          }
+        }
+      });
+  } catch (err) {
+    console.warn('Falha ao inicializar Supabase Realtime para simple_cakes:', err);
   }
 }
 

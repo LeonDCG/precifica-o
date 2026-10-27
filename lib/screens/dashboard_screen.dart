@@ -16,6 +16,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'admin_orders_panel_screen.dart';
 import 'admin_sellers_screen.dart';
+import 'simple_cakes_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -582,6 +583,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Icons.cake,
                         Colors.purple,
                         const AddProductScreen(),
+                      ),
+                      _buildQuickActionCard(
+                        context,
+                        'Controle de Bolos',
+                        Icons.cake_outlined,
+                        const Color(0xFFEC4899),
+                        const SimpleCakesScreen(),
                       ),
                       _buildQuickActionCard(
                         context,

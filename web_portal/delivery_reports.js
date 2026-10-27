@@ -138,8 +138,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 2,
     "gross_value": 50.98,
     "sales_revenue": 43.98,
-    "discounts": 14.0,
-    "commission": 6.18,
+    "discounts": 7.0,
+    "commission": 12.67,
     "net_value": 31.31,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -172,8 +172,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 3,
     "gross_value": 74.97,
     "sales_revenue": 64.97,
-    "discounts": 20.0,
-    "commission": 9.08,
+    "discounts": 10.0,
+    "commission": 18.57,
     "net_value": 46.4,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -206,8 +206,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 2,
     "gross_value": 51.98,
     "sales_revenue": 44.99,
-    "discounts": 13.98,
-    "commission": 6.3,
+    "discounts": 6.99,
+    "commission": 10.79,
     "net_value": 34.2,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -291,8 +291,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 2,
     "gross_value": 51.98,
     "sales_revenue": 44.98,
-    "discounts": 14.0,
-    "commission": 6.3,
+    "discounts": 7.0,
+    "commission": 12.79,
     "net_value": 32.19,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -359,8 +359,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 1,
     "gross_value": 49.98,
     "sales_revenue": 43.98,
-    "discounts": 12.0,
-    "commission": 6.05,
+    "discounts": 6.0,
+    "commission": 13.54,
     "net_value": 30.44,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -410,8 +410,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 1,
     "gross_value": 49.98,
     "sales_revenue": 43.98,
-    "discounts": 12.0,
-    "commission": 6.05,
+    "discounts": 6.0,
+    "commission": 13.54,
     "net_value": 30.44,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -427,8 +427,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 2,
     "gross_value": 49.98,
     "sales_revenue": 43.98,
-    "discounts": 12.0,
-    "commission": 6.05,
+    "discounts": 6.0,
+    "commission": 13.54,
     "net_value": 30.44,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -478,8 +478,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 6,
     "gross_value": 80.95,
     "sales_revenue": 76.96,
-    "discounts": 7.98,
-    "commission": 9.81,
+    "discounts": 3.99,
+    "commission": 16.3,
     "net_value": 60.66,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -529,8 +529,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 1,
     "gross_value": 24.99,
     "sales_revenue": 22.99,
-    "discounts": 4.0,
-    "commission": 3.03,
+    "discounts": 2.0,
+    "commission": 10.52,
     "net_value": 12.47,
     "pay_method": "Pagamento em dinheiro",
     "logistics": "Entrega da plataforma"
@@ -597,8 +597,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 1,
     "gross_value": 24.99,
     "sales_revenue": 22.99,
-    "discounts": 4.0,
-    "commission": 3.03,
+    "discounts": 2.0,
+    "commission": 6.52,
     "net_value": 16.47,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -631,8 +631,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 4,
     "gross_value": 99.96,
     "sales_revenue": 89.96,
-    "discounts": 20.0,
-    "commission": 12.1,
+    "discounts": 10.0,
+    "commission": 25.59,
     "net_value": 64.37,
     "pay_method": "Pagamento em dinheiro",
     "logistics": "Entrega da plataforma"
@@ -682,8 +682,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 2,
     "gross_value": 49.98,
     "sales_revenue": 43.98,
-    "discounts": 12.0,
-    "commission": 6.05,
+    "discounts": 6.0,
+    "commission": 11.54,
     "net_value": 32.44,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -801,8 +801,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 1,
     "gross_value": 23.99,
     "sales_revenue": 21.99,
-    "discounts": 4.0,
-    "commission": 2.91,
+    "discounts": 2.0,
+    "commission": 8.4,
     "net_value": 13.59,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -818,8 +818,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 2,
     "gross_value": 48.98,
     "sales_revenue": 42.98,
-    "discounts": 12.0,
-    "commission": 5.93,
+    "discounts": 6.0,
+    "commission": 11.42,
     "net_value": 31.56,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -869,8 +869,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 2,
     "gross_value": 47.98,
     "sales_revenue": 41.98,
-    "discounts": 12.0,
-    "commission": 5.82,
+    "discounts": 6.0,
+    "commission": 13.31,
     "net_value": 28.67,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -903,8 +903,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 2,
     "gross_value": 31.98,
     "sales_revenue": 28.98,
-    "discounts": 6.0,
-    "commission": 3.88,
+    "discounts": 3.0,
+    "commission": 9.37,
     "net_value": 19.61,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -937,8 +937,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 3,
     "gross_value": 71.97,
     "sales_revenue": 62.98,
-    "discounts": 17.98,
-    "commission": 8.72,
+    "discounts": 8.99,
+    "commission": 16.21,
     "net_value": 46.77,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -954,8 +954,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 2,
     "gross_value": 47.98,
     "sales_revenue": 41.98,
-    "discounts": 12.0,
-    "commission": 5.82,
+    "discounts": 6.0,
+    "commission": 11.31,
     "net_value": 30.67,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -971,8 +971,8 @@ const DEFAULT_DELIVERY_ORDERS = [
     "items_count": 6,
     "gross_value": 221.91,
     "sales_revenue": 217.92,
-    "discounts": 7.98,
-    "commission": 26.86,
+    "discounts": 3.99,
+    "commission": 40.35,
     "net_value": 177.57,
     "pay_method": "Pagamento online",
     "logistics": "Entrega da plataforma"
@@ -1337,7 +1337,7 @@ function getAvailableMonths() {
 }
 
 // VERSÃO DO CACHE DE DADOS DE DELIVERY (Garante sincronização imediata em todos os navegadores)
-const DELIVERY_CACHE_VERSION = '2026-10-26_v5_53orders';
+const DELIVERY_CACHE_VERSION = '2026-10-26_v6_exact_math';
 
 // INICIALIZAÇÃO DO MÓDULO DE RELATÓRIOS
 function initDeliveryReports() {
@@ -1810,7 +1810,7 @@ function parse99Sheet(headers, rows) {
     const mkt = parseNum(r[colMap.mkt]);
     const comissao = parseNum(r[colMap.comissao]);
     const taxaPgto = parseNum(r[colMap.taxaPgto]);
-    const freeDeliv = parseNum(r[colMap.freeDeliv]);
+    const logCost = parseNum(r[colMap.logisticsCost ?? 26]);
     const itemsCount = parseInt(r[colMap.itemCount] || '1', 10) || 1;
 
     parsed.push({
@@ -1824,8 +1824,8 @@ function parse99Sheet(headers, rows) {
       items_count: itemsCount,
       gross_value: gross > 0 ? gross : salesRev,
       sales_revenue: salesRev,
-      discounts: +(mkt + freeDeliv).toFixed(2),
-      commission: +(comissao + taxaPgto).toFixed(2),
+      discounts: +mkt.toFixed(2),
+      commission: +(comissao + taxaPgto + logCost).toFixed(2),
       net_value: net,
       pay_method: String(r[colMap.payMethod ?? 29] || 'Pagamento Online').trim(),
       logistics: String(r[colMap.logistics ?? 30] || 'Entrega da plataforma').trim()
