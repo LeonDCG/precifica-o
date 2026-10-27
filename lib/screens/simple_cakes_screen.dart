@@ -15,6 +15,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
   String _searchQuery = '';
   List<SimpleCake> _cakes = [];
   bool _isLoading = true;
+  bool _isGridView = true; // Alterna entre Cards (Grid) e Lista
 
   @override
   void initState() {
@@ -55,15 +56,36 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
 
   List<SimpleCake> get _filteredCakes {
     if (_searchQuery.isEmpty) return _cakes;
-    final q = _searchQuery.toLowerCase();
-    return _cakes.where((c) {
-      final name = c.name.toLowerCase();
-      final cat = c.category.toLowerCase();
-      final notes = (c.notes ?? '').toLowerCase();
-      return name.contains(q) || cat.contains(q) || notes.contains(q);
-    }).toList();
+    final q = _searchQuery.toLowerCase().trim();
+    return _cakes.where((c) => c.name.toLowerCase().contains(q)).toList();
   }
 
+  /// Mapeamento de Emojis idêntico ao padrão oficial da loja
+  String _getCakeEmoji(String name) {
+    final n = name.toLowerCase().trim();
+    if (n.contains('brownie')) return '⚡';
+    if (n.contains('café') || n.contains('cafe')) return '🧁';
+    if (n.contains('caramelo')) return '🥞';
+    if (n.contains('cenoura')) return '🍰';
+    if (n.contains('doce de leite')) return '🍫';
+    if (n.contains('chocolate') || n.contains('choc') || n.contains('brigadeir')) return '🍫';
+    if (n.contains('coco')) return '🍋';
+    if (n.contains('kinder')) return '🍋';
+    if (n.contains('limão') || n.contains('limao')) return '🍋';
+    if (n.contains('maracuj') || n.contains('maracuja')) return '🍋';
+    if (n.contains('matcha')) return '🧁';
+    if (n.contains('morango')) return '🍓';
+    if (n.contains('red velvet')) return '🍓';
+    if (n.contains('purple velvet') || n.contains('blueberry') || n.contains('mirtilo')) return '🫐';
+    if (n.contains('ninho')) return '🎂';
+    if (n.contains('nozes')) return '🥞';
+    if (n.contains('uva')) return '🎂';
+    if (n.contains('fub') || n.contains('milho')) return '🧁';
+    if (n.contains('abacaxi')) return '🍍';
+    return '🎂';
+  }
+
+  /// Ajuste rápido de quantidade (+ / -) com atualização otimista imediata e persistência
   Future<void> _adjustQty(SimpleCake cake, int delta) async {
     final currentQty = cake.quantity;
     final newQty = (currentQty + delta) < 0 ? 0 : (currentQty + delta);
@@ -71,7 +93,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
     if (currentQty == 0 && delta < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('O bolo "${cake.name}" já está zerado!'),
+          content: Text('"${cake.name}" já está zerado!'),
           duration: const Duration(seconds: 1),
           backgroundColor: Colors.orange.shade800,
         ),
@@ -87,13 +109,13 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
       }
     });
 
-    // 2. Persistência no Banco Supabase
+    // 2. Persistência em Nuvem no Supabase
     try {
       if (cake.id != null) {
         await DatabaseHelper.instance.updateSimpleCakeQuantity(cake.id!, newQty);
       }
     } catch (e) {
-      debugPrint('Erro ao sincronizar quantidade no Supabase: $e');
+      debugPrint('Erro ao atualizar quantidade no Supabase: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -105,20 +127,48 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
     }
   }
 
+  /// Toque para digitar quantidade exata
   Future<void> _promptExactQty(SimpleCake cake) async {
     final controller = TextEditingController(text: cake.quantity.toString());
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Definir Quantidade de ${cake.name}'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Quantidade em Balcão (unidades)',
-            border: OutlineInputBorder(),
-          ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Text(_getCakeEmoji(cake.name), style: const TextStyle(fontSize: 26)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                cake.name,
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Digite a quantidade em balcão:',
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                suffixText: 'unidades',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -126,6 +176,11 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEC4899),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () {
               final val = int.tryParse(controller.text.trim());
               if (val != null && val >= 0) {
@@ -144,14 +199,11 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
     }
   }
 
-  Future<void> _openCakeModal({SimpleCake? cake}) async {
+  /// Cadastro / Edição SUPER SIMPLES: Apenas Nome e Quantidade
+  Future<void> _openSimpleCakeModal({SimpleCake? cake}) async {
     final isEditing = cake != null;
     final nameCtrl = TextEditingController(text: cake?.name ?? '');
     final qtyCtrl = TextEditingController(text: cake?.quantity.toString() ?? '1');
-    final catCtrl = TextEditingController(text: cake?.category ?? 'Bolo Caseiro');
-    final ifoodCtrl = TextEditingController(text: (cake != null && cake.ifoodPrice > 0) ? cake.ifoodPrice.toStringAsFixed(2) : '');
-    final food99Ctrl = TextEditingController(text: (cake != null && cake.food99Price > 0) ? cake.food99Price.toStringAsFixed(2) : '');
-    final notesCtrl = TextEditingController(text: cake?.notes ?? '');
 
     await showDialog(
       context: context,
@@ -165,96 +217,44 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                 color: Colors.pink.shade50,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text('🎂', style: TextStyle(fontSize: 22)),
+              child: Text(
+                isEditing ? _getCakeEmoji(cake.name) : '🎂',
+                style: const TextStyle(fontSize: 24),
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                isEditing ? 'Editar Bolo' : 'Novo Bolo (Sem Ficha)',
+                isEditing ? 'Editar Bolo' : 'Novo Bolo',
                 style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ),
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                autofocus: !isEditing,
-                decoration: const InputDecoration(
-                  labelText: 'Nome do Bolo *',
-                  hintText: 'Ex: Cenoura com Chocolate, Red Velvet...',
-                  border: OutlineInputBorder(),
-                ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              autofocus: !isEditing,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: 'Nome do Bolo *',
+                hintText: 'Ex: Cenoura, Brownie, Red Velvet...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: qtyCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantidade',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: catCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Categoria',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: qtyCtrl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Quantidade Inicial',
+                suffixText: 'unidades',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: ifoodCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Preço iFood (R\$)',
-                        hintText: '22.99',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.circle, color: Colors.red, size: 14),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: food99Ctrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Preço 99Food (R\$)',
-                        hintText: '24.99',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.circle, color: Colors.orange, size: 14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: notesCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Observações / Sabores / Tamanho',
-                  hintText: 'Ex: Bolo Matilda, cobertura durinha...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -272,36 +272,17 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
               if (name.isEmpty) return;
 
               final qty = int.tryParse(qtyCtrl.text.trim()) ?? 0;
-              final cat = catCtrl.text.trim().isEmpty ? 'Bolo Caseiro' : catCtrl.text.trim();
-              final ifood = double.tryParse(ifoodCtrl.text.replaceAll(',', '.').trim()) ?? 0.0;
-              final food99 = double.tryParse(food99Ctrl.text.replaceAll(',', '.').trim()) ?? 0.0;
-              final notes = notesCtrl.text.trim();
-
               Navigator.pop(ctx);
 
               if (isEditing) {
-                final updated = cake.copyWith(
-                  name: name,
-                  quantity: qty,
-                  category: cat,
-                  ifoodPrice: ifood,
-                  food99Price: food99,
-                  notes: notes,
-                );
+                final updated = cake.copyWith(name: name, quantity: qty);
                 setState(() {
                   final idx = _cakes.indexWhere((c) => c.id == cake.id);
                   if (idx != -1) _cakes[idx] = updated;
                 });
                 await DatabaseHelper.instance.updateSimpleCake(updated);
               } else {
-                final newCake = SimpleCake(
-                  name: name,
-                  quantity: qty,
-                  category: cat,
-                  ifoodPrice: ifood,
-                  food99Price: food99,
-                  notes: notes,
-                );
+                final newCake = SimpleCake(name: name, quantity: qty);
                 final saved = await DatabaseHelper.instance.createSimpleCake(newCake);
                 setState(() {
                   _cakes.add(saved);
@@ -310,19 +291,20 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
               }
               _loadCakes(forceRefresh: true);
             },
-            child: Text(isEditing ? 'Salvar Alterações' : 'Cadastrar Bolo'),
+            child: Text(isEditing ? 'Salvar' : 'Adicionar Bolo'),
           ),
         ],
       ),
     );
   }
 
+  /// Excluir bolo
   Future<void> _deleteCake(SimpleCake cake) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir Bolo'),
-        content: Text('Deseja realmente excluir o bolo "${cake.name}" do controle direto?'),
+        content: Text('Deseja realmente remover o bolo "${cake.name}" do controle de estoque?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -342,30 +324,12 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
         _cakes.removeWhere((c) => c.id == cake.id);
       });
       await DatabaseHelper.instance.deleteSimpleCake(cake.id!);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Bolo "${cake.name}" excluído.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Bolo "${cake.name}" removido.')),
+        );
+      }
     }
-  }
-
-  Map<String, dynamic> _getCakeTheme(String name) {
-    final norm = name.toLowerCase();
-    if (norm.contains('choc') || norm.contains('brigadeir') || norm.contains('cacau')) {
-      return {'bg': const Color(0xFFFEF7EE), 'border': const Color(0xFF78350F), 'icon': '🍫'};
-    }
-    if (norm.contains('cenour') || norm.contains('laranja')) {
-      return {'bg': const Color(0xFFFFF7ED), 'border': const Color(0xFFEA580C), 'icon': '🍰'};
-    }
-    if (norm.contains('fub') || norm.contains('milho')) {
-      return {'bg': const Color(0xFFFEFCE8), 'border': const Color(0xFFCA8A04), 'icon': '🧁'};
-    }
-    if (norm.contains('morang') || norm.contains('red velvet')) {
-      return {'bg': const Color(0xFFFDF2F8), 'border': const Color(0xFFEC4899), 'icon': '🍓'};
-    }
-    if (norm.contains('lim') || norm.contains('abacaxi')) {
-      return {'bg': const Color(0xFFF0FDF4), 'border': const Color(0xFF16A34A), 'icon': '🍋'};
-    }
-    return {'bg': const Color(0xFFF8FAFC), 'border': const Color(0xFF64748B), 'icon': '🎂'};
   }
 
   @override
@@ -380,7 +344,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Controle Direto de Bolos',
+              'Estoque de Bolos',
               style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Row(
@@ -403,6 +367,12 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
           ],
         ),
         actions: [
+          // Alternar entre visualização em Cards ou Lista
+          IconButton(
+            icon: Icon(_isGridView ? Icons.view_list_rounded : Icons.grid_view_rounded),
+            tooltip: _isGridView ? 'Ver em Lista' : 'Ver em Cards',
+            onPressed: () => setState(() => _isGridView = !_isGridView),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Atualizar do Banco',
@@ -421,17 +391,17 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
 
           return Column(
             children: [
-              // Barra de Busca
+              // Barra de Busca Rápida
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Buscar bolo por sabor ou observação...',
-                    prefixIcon: const Icon(Icons.search),
+                    hintText: 'Buscar sabor...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(Icons.clear, size: 18),
                             onPressed: () {
                               _searchController.clear();
                               setState(() => _searchQuery = '');
@@ -440,33 +410,38 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                         : null,
                     filled: true,
                     fillColor: Theme.of(context).cardColor,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
                     ),
                   ),
                   onChanged: (v) => setState(() => _searchQuery = v),
                 ),
               ),
 
-              // Cards de Estatísticas no Topo
+              // Resumo Minimalista no Topo
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Row(
                   children: [
-                    _buildStatPill('Total', '$totalUnits un', Colors.pink.shade100, Colors.pink.shade900),
+                    _buildStatPill('Total', '$totalUnits un', const Color(0xFFFCE7F3), const Color(0xFF9D174D)),
                     const SizedBox(width: 8),
-                    _buildStatPill('Tipos', '$totalTypes tipos', Colors.blue.shade100, Colors.blue.shade900),
+                    _buildStatPill('Sabores', '$totalTypes tipos', const Color(0xFFE0E7FF), const Color(0xFF3730A3)),
                     const SizedBox(width: 8),
-                    _buildStatPill('Zerados', '$zeroCount esgotados', Colors.red.shade100, Colors.red.shade900),
+                    _buildStatPill('Zerados', '$zeroCount esgotados', const Color(0xFFFEE2E2), const Color(0xFF991B1B)),
                   ],
                 ),
               ),
 
               const Divider(height: 16),
 
-              // Lista de Bolos com botões rápidos (+ / -)
+              // Lista / Grid de Bolos Super Simples
               Expanded(
                 child: _isLoading && _cakes.isEmpty
                     ? const Center(child: CircularProgressIndicator())
@@ -491,15 +466,9 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                           )
                         : RefreshIndicator(
                             onRefresh: () => _loadCakes(forceRefresh: true),
-                            child: ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                              itemCount: displayList.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 12),
-                              itemBuilder: (context, index) {
-                                final cake = displayList[index];
-                                return _buildCakeCard(cake);
-                              },
-                            ),
+                            child: _isGridView
+                                ? _buildGridView(displayList)
+                                : _buildListView(displayList),
                           ),
               ),
             ],
@@ -511,7 +480,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('Novo Bolo', style: TextStyle(fontWeight: FontWeight.bold)),
-        onPressed: () => _openCakeModal(),
+        onPressed: () => _openSimpleCakeModal(),
       ),
     );
   }
@@ -519,15 +488,15 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
   Widget _buildStatPill(String label, String value, Color bgColor, Color textColor) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
           children: [
-            Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textColor.withOpacity(0.8))),
-            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: textColor)),
+            const SizedBox(height: 1),
             Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textColor)),
           ],
         ),
@@ -535,142 +504,209 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
     );
   }
 
-  Widget _buildCakeCard(SimpleCake cake) {
-    final theme = _getCakeTheme(cake.name);
+  /// Visão em Cards (Grid 2 colunas) - A visão exata compartilhada pelo usuário
+  Widget _buildGridView(List<SimpleCake> list) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 3 : 2);
+
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 80),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.78, // Proporção confortável para caber Emoji, Nome, Status e Botões
+      ),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        final cake = list[index];
+        return _buildCakeGridCard(cake);
+      },
+    );
+  }
+
+  /// Card Visual idêntico ao modelo:
+  /// [Emoji]
+  /// Nome do Bolo
+  /// ✓ DISPONÍVEL / ⚠️ ESGOTADO / ZERADO
+  /// X unidades
+  /// [-]  [+]
+  Widget _buildCakeGridCard(SimpleCake cake) {
+    final emoji = _getCakeEmoji(cake.name);
     final isZero = cake.quantity == 0;
 
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isZero ? Colors.red.shade300 : (theme['border'] as Color).withOpacity(0.4),
+          color: isZero ? Colors.red.shade300 : Colors.grey.shade200,
           width: isZero ? 1.5 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
+      child: Stack(
         children: [
-          // Informações do Bolo
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: theme['bg'] as Color,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: (theme['border'] as Color).withOpacity(0.3)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(theme['icon'] as String, style: const TextStyle(fontSize: 22)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          // Menu de opções rápidas (Editar / Excluir)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: PopupMenuButton<String>(
+              padding: EdgeInsets.zero,
+              icon: Icon(Icons.more_horiz, size: 20, color: Colors.grey.shade500),
+              onSelected: (val) {
+                if (val == 'edit') {
+                  _openSimpleCakeModal(cake: cake);
+                } else if (val == 'delete') {
+                  _deleteCake(cake);
+                }
+              },
+              itemBuilder: (ctx) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
                     children: [
-                      Text(
-                        cake.name,
-                        style: GoogleFonts.outfit(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isZero ? Colors.red.shade700 : null,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isZero ? Colors.red.shade50 : Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              isZero ? '⚠️ ESGOTADO' : '✓ DISPONÍVEL',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isZero ? Colors.red.shade700 : Colors.green.shade800,
-                              ),
-                            ),
-                          ),
-                          if (cake.ifoodPrice > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '🔴 iFood: R\$ ${cake.ifoodPrice.toStringAsFixed(2)}',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red.shade700),
-                              ),
-                            ),
-                          if (cake.food99Price > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade50,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '🟠 99: R\$ ${cake.food99Price.toStringAsFixed(2)}',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange.shade800),
-                              ),
-                            ),
-                        ],
-                      ),
-                      if (cake.notes != null && cake.notes!.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '📝 ${cake.notes!}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
-                        ),
-                      ],
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Renomear'),
                     ],
                   ),
                 ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, size: 20),
-                  onSelected: (val) {
-                    if (val == 'edit') {
-                      _openCakeModal(cake: cake);
-                    } else if (val == 'delete') {
-                      _deleteCake(cake);
-                    }
-                  },
-                  itemBuilder: (ctx) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 18),
-                          SizedBox(width: 8),
-                          Text('Alterar'),
-                        ],
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.red, size: 18),
+                      SizedBox(width: 8),
+                      Text('Excluir', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Conteúdo Central: Emoji + Nome + Status + Quantidade + Stepper
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Topo: Emoji
+                Text(
+                  emoji,
+                  style: const TextStyle(fontSize: 34),
+                ),
+
+                // Nome do Bolo (Destaque limpo)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    cake.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isZero ? Colors.red.shade700 : const Color(0xFF1E293B),
+                    ),
+                  ),
+                ),
+
+                // Status Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isZero ? const Color(0xFFFEE2E2) : const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isZero ? '⚠️ ESGOTADO / ZERADO' : '✓ DISPONÍVEL',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                      color: isZero ? const Color(0xFF991B1B) : const Color(0xFF166534),
+                    ),
+                  ),
+                ),
+
+                // Quantidade (Toque para editar o número direto)
+                InkWell(
+                  onTap: () => _promptExactQty(cake),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    child: Column(
+                      children: [
+                        Text(
+                          '${cake.quantity}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: isZero ? Colors.red.shade700 : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        Text(
+                          cake.quantity == 1 ? 'unidade' : 'unidades',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Botões de Ajuste Rápido [-] e [+]
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Botão Menos (-)
+                    Material(
+                      color: isZero ? Colors.grey.shade100 : Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => _adjustQty(cake, -1),
+                        child: SizedBox(
+                          width: 44,
+                          height: 38,
+                          child: Icon(
+                            Icons.remove,
+                            color: isZero ? Colors.grey.shade400 : Colors.red.shade700,
+                            size: 22,
+                          ),
+                        ),
                       ),
                     ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, color: Colors.red, size: 18),
-                          SizedBox(width: 8),
-                          Text('Excluir', style: TextStyle(color: Colors.red)),
-                        ],
+                    const SizedBox(width: 14),
+                    // Botão Mais (+)
+                    Material(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => _adjustQty(cake, 1),
+                        child: SizedBox(
+                          width: 44,
+                          height: 38,
+                          child: Icon(
+                            Icons.add,
+                            color: Colors.green.shade800,
+                            size: 22,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -678,82 +714,101 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
               ],
             ),
           ),
-
-          // Barra inferior com botões rápidos (+ / -)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: isZero ? Colors.red.shade50.withOpacity(0.4) : Colors.grey.shade50,
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Botão Menos (-)
-                Material(
-                  color: Colors.red.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => _adjustQty(cake, -1),
-                    child: const SizedBox(
-                      width: 52,
-                      height: 48,
-                      child: Icon(Icons.remove, color: Colors.red, size: 28),
-                    ),
-                  ),
-                ),
-
-                // Quantidade (Toque para digitar)
-                InkWell(
-                  onTap: () => _promptExactQty(cake),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: Column(
-                      children: [
-                        Text(
-                          '${cake.quantity}',
-                          style: GoogleFonts.outfit(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                            color: isZero ? Colors.red.shade700 : const Color(0xFF0F172A),
-                          ),
-                        ),
-                        Text(
-                          'unidades',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Botão Mais (+)
-                Material(
-                  color: Colors.green.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => _adjustQty(cake, 1),
-                    child: const SizedBox(
-                      width: 52,
-                      height: 48,
-                      child: Icon(Icons.add, color: Colors.green, size: 28),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
+    );
+  }
+
+  /// Visão alternativa em Lista (Linhas simples e compactas)
+  Widget _buildListView(List<SimpleCake> list) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+      itemCount: list.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final cake = list[index];
+        final emoji = _getCakeEmoji(cake.name);
+        final isZero = cake.quantity == 0;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isZero ? Colors.red.shade200 : Colors.grey.shade200,
+            ),
+          ),
+          child: Row(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 28)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cake.name,
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isZero ? Colors.red.shade700 : null,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isZero ? '⚠️ ESGOTADO' : '✓ DISPONÍVEL',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: isZero ? Colors.red.shade700 : Colors.green.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Stepper Compacto
+              Material(
+                color: isZero ? Colors.grey.shade100 : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _adjustQty(cake, -1),
+                  child: SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: Icon(Icons.remove, size: 20, color: isZero ? Colors.grey : Colors.red.shade700),
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () => _promptExactQty(cake),
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  child: Text(
+                    '${cake.quantity}',
+                    style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+              Material(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _adjustQty(cake, 1),
+                  child: const SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: Icon(Icons.add, size: 20, color: Colors.green),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
