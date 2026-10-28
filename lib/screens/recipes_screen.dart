@@ -108,13 +108,24 @@ class _RecipesScreenState extends State<RecipesScreen> {
   List<Recipe> _recipes = [];
   bool _isLoading = true;
 
-  // Controle de expansão: por padrão vazios (minimizados)
+  // Controle de expansão: categorias abertas por padrão
   final Set<String> _expandedCategories = {};
   final Set<String> _expandedSubgroups = {};
 
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  static String _normalizeCategory(String? raw) {
+    if (raw == null) return 'Geral';
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return 'Geral';
+    final lower = trimmed.toLowerCase();
+    if (lower == 'brownie') return 'Brownies';
+    if (lower == 'geleia') return 'Geléias';
+    if (lower == 'chantilly') return 'Chantillys';
+    return trimmed;
+  }
 
   @override
   void initState() {
@@ -123,6 +134,9 @@ class _RecipesScreenState extends State<RecipesScreen> {
     if (cached != null && cached.isNotEmpty) {
       _recipes = cached;
       _isLoading = false;
+      for (var r in _recipes) {
+        _expandedCategories.add(_normalizeCategory(r.category));
+      }
     }
     _refreshRecipes(force: false);
   }
@@ -143,6 +157,11 @@ class _RecipesScreenState extends State<RecipesScreen> {
       if (mounted) {
         setState(() {
           _recipes = fetched;
+          if (_expandedCategories.isEmpty) {
+            for (var r in _recipes) {
+              _expandedCategories.add(_normalizeCategory(r.category));
+            }
+          }
         });
       }
     } catch (e) {
@@ -168,7 +187,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
     // 1. Agrupar receitas filtradas por categoria principal
     final Map<String, List<Recipe>> byCategory = {};
     for (var recipe in _filteredRecipes) {
-      final cat = recipe.category.trim().isEmpty ? 'Geral' : recipe.category.trim();
+      final cat = _normalizeCategory(recipe.category);
       byCategory.putIfAbsent(cat, () => []).add(recipe);
     }
 
@@ -372,7 +391,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '$totalDisplay receitas cadastradas • Minimizadas por padrão',
+                              '$totalDisplay receitas cadastradas • Agrupadas por Categoria',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade400),
                             ),
                           ],
@@ -626,122 +645,132 @@ class _RecipesScreenState extends State<RecipesScreen> {
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(color: Colors.grey.withOpacity(0.15)),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddRecipeScreen(recipe: recipe)),
-          );
-          _refreshRecipes(force: true);
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // LINHA 1: TÍTULO DA RECEITA/VARIAÇÃO (100% de largura disponível) + AÇÕES
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 4,
-                    height: 20,
-                    margin: const EdgeInsets.only(right: 8, top: 2),
-                    decoration: BoxDecoration(
-                      color: stripeColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      displayName,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: isStandalone ? 14 : 13.5,
-                        color: Colors.white,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // Botão Modo Cozinha (Cozinhar)
-                  InkWell(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // LINHA 1: TÍTULO DA RECEITA/VARIAÇÃO + AÇÕES INDEPENDENTES
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Área clicável para editar a receita
+                Expanded(
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(6),
-                    onTap: () {
-                      Navigator.push(
+                    onTap: () async {
+                      await Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => RecipeCookbookScreen(
-                            initialRecipe: recipe,
-                            allRecipes: _recipes,
+                        MaterialPageRoute(builder: (context) => AddRecipeScreen(recipe: recipe)),
+                      );
+                      _refreshRecipes(force: true);
+                    },
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 20,
+                          margin: const EdgeInsets.only(right: 8, top: 2),
+                          decoration: BoxDecoration(
+                            color: stripeColor,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      margin: const EdgeInsets.only(right: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEC4899).withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFEC4899).withOpacity(0.4)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.soup_kitchen_rounded, color: Color(0xFFEC4899), size: 14),
-                          SizedBox(width: 4),
-                          Text(
-                            'Cozinhar',
+                        Expanded(
+                          child: Text(
+                            displayName,
                             style: TextStyle(
-                              color: Color(0xFFEC4899),
-                              fontSize: 11,
                               fontWeight: FontWeight.bold,
+                              fontSize: isStandalone ? 14 : 13.5,
+                              color: Colors.white,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Botão Modo Cozinha (Cozinhar) - Totalmente independente e sem interferência de gestos
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEC4899),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => RecipeCookbookScreen(
+                          initialRecipe: recipe,
+                          allRecipes: _recipes,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.soup_kitchen_rounded, size: 14),
+                  label: const Text(
+                    'Cozinhar',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 4),
+
+                // Botão de Excluir Compacto
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Excluir Receita',
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Excluir Receita'),
+                        content: Text('Deseja realmente excluir "${recipe.name}"?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancelar'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                  // Botão de Excluir Compacto
-                  InkWell(
-                    borderRadius: BorderRadius.circular(6),
-                    onTap: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Excluir Receita'),
-                          content: Text('Deseja realmente excluir "${recipe.name}"?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('Cancelar'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('Excluir', style: TextStyle(color: Colors.red)),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true) {
-                        await DatabaseHelper.instance.deleteRecipe(recipe.id!);
-                        _refreshRecipes(force: true);
-                      }
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.all(4.0),
-                      child: Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                    ),
-                  ),
-                ],
-              ),
+                    );
+                    if (confirm == true) {
+                      await DatabaseHelper.instance.deleteRecipe(recipe.id!);
+                      _refreshRecipes(force: true);
+                    }
+                  },
+                ),
+              ],
+            ),
 
-              const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-              // LINHA 2: RENDIMENTO E CUSTOS EM BADGES HORIZONTAIS
-              Wrap(
+            // LINHA 2: RENDIMENTO E CUSTOS EM BADGES HORIZONTAIS (Clicável para editar)
+            InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => AddRecipeScreen(recipe: recipe)),
+                );
+                _refreshRecipes(force: true);
+              },
+              child: Wrap(
                 spacing: 8,
                 runSpacing: 4,
                 crossAxisAlignment: WrapCrossAlignment.center,
@@ -782,8 +811,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

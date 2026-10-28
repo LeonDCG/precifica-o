@@ -776,42 +776,119 @@ class _RecipeCookbookScreenState extends State<RecipeCookbookScreen> {
                       Expanded(
                         child: filtered.isEmpty
                             ? const Center(child: Text('Nenhuma receita encontrada.'))
-                            : ListView.separated(
-                                controller: scrollController,
-                                itemCount: filtered.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1),
-                                itemBuilder: (_, idx) {
-                                  final r = filtered[idx];
-                                  final isCurrent = _selectedRecipe?.id == r.id;
+                            : Builder(
+                                builder: (context) {
+                                  final Map<String, List<Recipe>> byCategory = {};
+                                  for (var r in filtered) {
+                                    String cat = r.category.trim();
+                                    if (cat.isEmpty) {
+                                      cat = 'Geral';
+                                    } else if (cat.toLowerCase() == 'brownie') {
+                                      cat = 'Brownies';
+                                    } else if (cat.toLowerCase() == 'geleia') {
+                                      cat = 'Geléias';
+                                    }
+                                    byCategory.putIfAbsent(cat, () => []).add(r);
+                                  }
 
-                                  return ListTile(
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    leading: Text(
-                                      _getCategoryIcon(r.category),
-                                      style: const TextStyle(fontSize: 24),
-                                    ),
-                                    title: Text(
-                                      r.name,
-                                      style: TextStyle(
-                                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
-                                        color: isCurrent
-                                            ? const Color(0xFFEC4899)
-                                            : (isDark ? Colors.white : const Color(0xFF0F172A)),
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      '${r.category} • ${r.ingredients.length} ingredientes',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isDark ? Colors.white60 : Colors.grey.shade600,
-                                      ),
-                                    ),
-                                    trailing: isCurrent
-                                        ? const Icon(Icons.check_circle, color: Color(0xFFEC4899))
-                                        : const Icon(Icons.chevron_right, color: Colors.grey),
-                                    onTap: () {
-                                      Navigator.pop(ctx);
-                                      _selectRecipe(r);
+                                  final sortedCategories = byCategory.keys.toList()
+                                    ..sort((a, b) {
+                                      if (a.toLowerCase() == 'massas') return -1;
+                                      if (b.toLowerCase() == 'massas') return 1;
+                                      return a.toLowerCase().compareTo(b.toLowerCase());
+                                    });
+
+                                  return ListView.builder(
+                                    controller: scrollController,
+                                    itemCount: sortedCategories.length,
+                                    itemBuilder: (_, catIdx) {
+                                      final cat = sortedCategories[catIdx];
+                                      final recs = byCategory[cat]!;
+
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 14, bottom: 6, left: 4, right: 4),
+                                            child: Row(
+                                              children: [
+                                                Text(_getCategoryIcon(cat), style: const TextStyle(fontSize: 18)),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  cat,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEC4899).withOpacity(0.15),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                  ),
+                                                  child: Text(
+                                                    '${recs.length}',
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFFEC4899),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          ...recs.map((r) {
+                                            final isCurrent = _selectedRecipe?.id == r.id;
+                                            return Container(
+                                              margin: const EdgeInsets.only(bottom: 6),
+                                              decoration: BoxDecoration(
+                                                color: isCurrent
+                                                    ? const Color(0xFFEC4899).withOpacity(0.12)
+                                                    : (isDark ? const Color(0xFF26262D) : Colors.grey.shade50),
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(
+                                                  color: isCurrent
+                                                      ? const Color(0xFFEC4899)
+                                                      : (isDark ? Colors.white12 : Colors.grey.shade200),
+                                                  width: isCurrent ? 1.5 : 1.0,
+                                                ),
+                                              ),
+                                              child: ListTile(
+                                                dense: true,
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                                                title: Text(
+                                                  r.name,
+                                                  style: TextStyle(
+                                                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                                                    fontSize: 14,
+                                                    color: isCurrent
+                                                        ? const Color(0xFFEC4899)
+                                                        : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                                                  ),
+                                                ),
+                                                subtitle: Text(
+                                                  '${r.ingredients.length} ingredientes • Rende: ${r.yieldAmount.toStringAsFixed(0)} ${r.yieldUnit}',
+                                                  style: TextStyle(
+                                                    fontSize: 11.5,
+                                                    color: isDark ? Colors.white60 : Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                                trailing: isCurrent
+                                                    ? const Icon(Icons.check_circle, color: Color(0xFFEC4899), size: 20)
+                                                    : const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+                                                onTap: () {
+                                                  Navigator.pop(ctx);
+                                                  _selectRecipe(r);
+                                                },
+                                              ),
+                                            );
+                                          }),
+                                        ],
+                                      );
                                     },
                                   );
                                 },

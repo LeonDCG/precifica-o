@@ -16,6 +16,7 @@ let movementsList = [];
 let simpleCakesList = [];
 
 // MODOS E AGRUPAMENTOS
+let collapsedRecipeCategories = new Set();
 let collapsedRecipeGroups = new Set();
 let isRecipeGroupingEnabled = true;
 let activeProductViewMode = 'catalog'; // 'catalog' (cards do App) ou 'table' (estoque)
@@ -552,14 +553,25 @@ function parseRecipeName(name) {
   };
 }
 
-function getRecipeCategory(name) {
-  const n = (name || '').toLowerCase();
+function getRecipeCategory(recOrName) {
+  if (recOrName && typeof recOrName === 'object') {
+    if (recOrName.category && recOrName.category.trim()) {
+      let c = recOrName.category.trim();
+      if (c.toLowerCase() === 'brownie') return 'Brownies';
+      if (c.toLowerCase() === 'geleia') return 'Geléias';
+      return c;
+    }
+    recOrName = recOrName.name || '';
+  }
+  const n = (recOrName || '').toLowerCase().trim();
   if (n.startsWith('massa')) return 'Massas';
   if (n.startsWith('brigadeiro')) return 'Brigadeiros';
   if (n.startsWith('recheio')) return 'Recheios';
+  if (n.startsWith('calda')) return 'Caldas';
   if (n.includes('geléia') || n.includes('geleia')) return 'Geléias';
   if (n.includes('chantininho') || n.includes('chantilly')) return 'Chantillys';
   if (n.includes('brownie')) return 'Brownies';
+  if (n.includes('caramelo')) return 'Recheios';
   return 'Geral';
 }
 
@@ -568,9 +580,10 @@ function getRecipeIcon(name, category) {
   if (cat === 'Massas') return '🥣';
   if (cat === 'Brigadeiros') return '🍫';
   if (cat === 'Recheios') return '🍯';
+  if (cat === 'Caldas') return '🥛';
   if (cat === 'Geléias') return '🍓';
-  if (cat === 'Chantillys') return '🥛';
-  if (cat === 'Brownies') return '🧁';
+  if (cat === 'Chantillys') return '🧁';
+  if (cat === 'Brownies' || cat === 'Brownie') return '🍫';
   return '🍰';
 }
 
@@ -601,12 +614,21 @@ function toggleRecipeGrouping() {
     if (isRecipeGroupingEnabled) {
       btn.classList.remove('btn-outline');
       btn.classList.add('btn-secondary');
-      txt.textContent = 'Agrupado por Proporção';
+      txt.textContent = 'Agrupado por Categoria/Proporção';
     } else {
       btn.classList.remove('btn-secondary');
       btn.classList.add('btn-outline');
       txt.textContent = 'Lista Individual (Todas)';
     }
+  }
+  filterRecipes();
+}
+
+function toggleRecipeCategoryAccordion(catKey) {
+  if (collapsedRecipeCategories.has(catKey)) {
+    collapsedRecipeCategories.delete(catKey);
+  } else {
+    collapsedRecipeCategories.add(catKey);
   }
   filterRecipes();
 }
@@ -635,7 +657,7 @@ function renderRecipesTable(list) {
       const totalCost = getRecipeTotalCost(rec);
       const yieldAmt = Number(rec.yieldamount) || 1;
       const unitCost = yieldAmt > 0 ? (totalCost / yieldAmt) : totalCost;
-      const cat = getRecipeCategory(rec.name);
+      const cat = getRecipeCategory(rec);
       const icon = getRecipeIcon(rec.name, cat);
 
       return `
@@ -653,12 +675,12 @@ function renderRecipesTable(list) {
           <td><strong>${formatBRL(totalCost)}</strong></td>
           <td class="text-green font-bold">${formatBRL(unitCost)} / ${escapeHtml(rec.yieldunit || 'un')}</td>
           <td class="text-right" style="white-space: nowrap;">
-            <button class="btn btn-sm btn-secondary" onclick="openKitchenModeModal(${rec.id})" title="Abrir no Modo Cozinha" style="border-color:#ec4899; color:#be185d; font-weight:700;">📖 Cozinhar</button>
-            <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${rec.id})" title="Registrar produção desta receita">+ Produzir</button>
-            <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${rec.id})">
+            <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openKitchenModeModal(${rec.id})" title="Abrir no Modo Cozinha" style="border-color:#ec4899; color:#be185d; font-weight:700;">📖 Cozinhar</button>
+            <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openProductionFromRecipe(${rec.id})" title="Registrar produção desta receita">+ Produzir</button>
+            <button class="btn-icon" title="Editar Receita" onclick="event.stopPropagation(); openEditRecipeModal(${rec.id})">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
-            <button class="btn-icon delete" title="Excluir Receita" onclick="deleteRecipe(${rec.id}, '${escapeHtml(rec.name)}')">
+            <button class="btn-icon delete" title="Excluir Receita" onclick="event.stopPropagation(); deleteRecipe(${rec.id}, '${escapeHtml(rec.name)}')">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
             </button>
           </td>
@@ -668,101 +690,177 @@ function renderRecipesTable(list) {
     return;
   }
 
-  // MODO AGRUPADO POR FAMÍLIA E PROPORÇÃO
-  const groups = new Map();
-  const standalones = [];
-
+  // MODO AGRUPADO POR CATEGORIA E SUBGRUPOS (FAMÍLIA/PROPORÇÃO)
+  const byCategory = new Map();
   list.forEach(rec => {
-    const parsed = parseRecipeName(rec.name);
-    if (parsed.isGrouped) {
-      if (!groups.has(parsed.familyName)) {
-        groups.set(parsed.familyName, []);
-      }
-      groups.get(parsed.familyName).push({ ...rec, parsed });
-    } else {
-      standalones.push({ ...rec, parsed });
+    const cat = getRecipeCategory(rec);
+    if (!byCategory.has(cat)) {
+      byCategory.set(cat, []);
     }
+    byCategory.get(cat).push(rec);
+  });
+
+  // Ordenar categorias: 'Massas' primeiro, depois alfabética
+  const sortedCategories = Array.from(byCategory.keys()).sort((a, b) => {
+    if (a.toLowerCase() === 'massas') return -1;
+    if (b.toLowerCase() === 'massas') return 1;
+    return a.localeCompare(b);
   });
 
   let html = '';
 
-  // 1. Renderiza Famílias Agrupadas
-  groups.forEach((variants, familyName) => {
-    variants.sort((a, b) => (a.parsed.eggCount || 0) - (b.parsed.eggCount || 0));
+  sortedCategories.forEach(cat => {
+    const catRecipes = byCategory.get(cat);
+    const isCatCollapsed = collapsedRecipeCategories.has(cat);
+    const catIcon = getRecipeIcon('', cat);
 
-    const totalCosts = variants.map(v => getRecipeTotalCost(v));
-    const minCost = Math.min(...totalCosts);
-    const maxCost = Math.max(...totalCosts);
-
-    const unitCosts = variants.map(v => {
-      const c = getRecipeTotalCost(v);
-      const y = Number(v.yieldamount) || 1;
-      return y > 0 ? c / y : c;
-    });
-    const minUnitCost = Math.min(...unitCosts);
-    const maxUnitCost = Math.max(...unitCosts);
-
-    const isCollapsed = collapsedRecipeGroups.has(familyName);
-    const cat = getRecipeCategory(familyName);
-    const icon = getRecipeIcon(familyName, cat);
-
-    const eggCounts = variants.map(v => v.parsed.eggCount).filter(Boolean);
-    const eggMin = Math.min(...eggCounts);
-    const eggMax = Math.max(...eggCounts);
-    const badgeText = `${variants.length} proporções (${eggMin} a ${eggMax} ovos)`;
-
-    const costRangeStr = minCost === maxCost ? formatBRL(minCost) : `${formatBRL(minCost)} ~ ${formatBRL(maxCost)}`;
-    const unitCostRangeStr = minUnitCost === maxUnitCost ? `${formatBRL(minUnitCost)} / un` : `${formatBRL(minUnitCost)} ~ ${formatBRL(maxUnitCost)} / un`;
-
+    // 1. Cabeçalho de Categoria (ex: Massas, Brigadeiros, Recheios...)
     html += `
-      <tr class="recipe-group-header-row" onclick="toggleRecipeGroupAccordion('${escapeHtml(familyName)}')" style="cursor: pointer;" title="Clique para expandir/recolher as proporções">
-        <td>
-          <div class="recipe-group-title-box">
-            <span class="recipe-group-chevron ${isCollapsed ? 'collapsed' : ''}">${isCollapsed ? '▶' : '▼'}</span>
-            <span class="recipe-group-icon">${icon}</span>
-            <div>
-              <span class="recipe-group-name">${escapeHtml(familyName)}</span>
-              <span class="recipe-group-badge">🥚 ${badgeText}</span>
-              <span class="stat-badge blue" style="margin-left: 6px; font-size: 11px;">${cat}</span>
-            </div>
+      <tr class="recipe-category-header-row" onclick="toggleRecipeCategoryAccordion('${escapeHtml(cat)}')" style="cursor: pointer;" title="Clique para expandir/recolher a categoria ${escapeHtml(cat)}">
+        <td colspan="4">
+          <div class="recipe-category-title-box">
+            <span class="recipe-group-chevron ${isCatCollapsed ? 'collapsed' : ''}">${isCatCollapsed ? '▶' : '▼'}</span>
+            <span style="font-size: 20px;">${catIcon}</span>
+            <span class="recipe-category-name">${escapeHtml(cat)}</span>
+            <span class="recipe-category-badge">${catRecipes.length} receita${catRecipes.length > 1 ? 's' : ''}</span>
           </div>
         </td>
-        <td><span style="color:#64748b; font-size:13px;">Varia por proporção</span></td>
-        <td><span class="recipe-group-cost-range">${costRangeStr}</span></td>
-        <td><span class="recipe-group-cost-range text-green font-bold">${unitCostRangeStr}</span></td>
         <td class="text-right" style="white-space: nowrap;">
-          <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); toggleRecipeGroupAccordion('${escapeHtml(familyName)}');">
-            ${isCollapsed ? 'Ver Proporções (' + variants.length + ')' : 'Recolher'}
+          <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); toggleRecipeCategoryAccordion('${escapeHtml(cat)}');">
+            ${isCatCollapsed ? 'Expandir Categoria' : 'Recolher Categoria'}
           </button>
         </td>
       </tr>
     `;
 
-    if (!isCollapsed) {
-      variants.forEach(v => {
-        const vCost = getRecipeTotalCost(v);
-        const vYield = Number(v.yieldamount) || 1;
-        const vUnitCost = vYield > 0 ? (vCost / vYield) : vCost;
+    if (!isCatCollapsed) {
+      // Agrupar itens da categoria em famílias com variações (ex: Massas com ovos) e avulsos
+      const familyGroups = new Map();
+      const standalones = [];
+
+      catRecipes.forEach(rec => {
+        const parsed = parseRecipeName(rec.name);
+        if (parsed.isGrouped) {
+          if (!familyGroups.has(parsed.familyName)) {
+            familyGroups.set(parsed.familyName, []);
+          }
+          familyGroups.get(parsed.familyName).push({ ...rec, parsed });
+        } else {
+          standalones.push({ ...rec, parsed });
+        }
+      });
+
+      // Se houver famílias de variações (ex: Massas com ovos)
+      familyGroups.forEach((variants, familyName) => {
+        variants.sort((a, b) => (a.parsed.eggCount || 0) - (b.parsed.eggCount || 0));
+
+        const totalCosts = variants.map(v => getRecipeTotalCost(v));
+        const minCost = Math.min(...totalCosts);
+        const maxCost = Math.max(...totalCosts);
+
+        const unitCosts = variants.map(v => {
+          const c = getRecipeTotalCost(v);
+          const y = Number(v.yieldamount) || 1;
+          return y > 0 ? c / y : c;
+        });
+        const minUnitCost = Math.min(...unitCosts);
+        const maxUnitCost = Math.max(...unitCosts);
+
+        const isCollapsed = collapsedRecipeGroups.has(familyName);
+        const icon = getRecipeIcon(familyName, cat);
+
+        const eggCounts = variants.map(v => v.parsed.eggCount).filter(Boolean);
+        const eggMin = Math.min(...eggCounts);
+        const eggMax = Math.max(...eggCounts);
+        const badgeText = `${variants.length} proporções (${eggMin} a ${eggMax} ovos)`;
+
+        const costRangeStr = minCost === maxCost ? formatBRL(minCost) : `${formatBRL(minCost)} ~ ${formatBRL(maxCost)}`;
+        const unitCostRangeStr = minUnitCost === maxUnitCost ? `${formatBRL(minUnitCost)} / un` : `${formatBRL(minUnitCost)} ~ ${formatBRL(maxUnitCost)} / un`;
+
+        html += `
+          <tr class="recipe-group-header-row" onclick="toggleRecipeGroupAccordion('${escapeHtml(familyName)}')" style="cursor: pointer;" title="Clique para expandir/recolher as proporções">
+            <td>
+              <div class="recipe-group-title-box" style="padding-left: 20px;">
+                <span class="recipe-group-chevron ${isCollapsed ? 'collapsed' : ''}">${isCollapsed ? '▶' : '▼'}</span>
+                <span class="recipe-group-icon" style="font-size: 18px; width: 32px; height: 32px;">${icon}</span>
+                <div>
+                  <span class="recipe-group-name" style="font-size: 14.5px;">${escapeHtml(familyName)}</span>
+                  <span class="recipe-group-badge">🥚 ${badgeText}</span>
+                </div>
+              </div>
+            </td>
+            <td><span style="color:#64748b; font-size:13px;">Varia por proporção</span></td>
+            <td><span class="recipe-group-cost-range">${costRangeStr}</span></td>
+            <td><span class="recipe-group-cost-range text-green font-bold">${unitCostRangeStr}</span></td>
+            <td class="text-right" style="white-space: nowrap;">
+              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); toggleRecipeGroupAccordion('${escapeHtml(familyName)}');">
+                ${isCollapsed ? 'Ver Proporções (' + variants.length + ')' : 'Recolher'}
+              </button>
+            </td>
+          </tr>
+        `;
+
+        if (!isCollapsed) {
+          variants.forEach(v => {
+            const vCost = getRecipeTotalCost(v);
+            const vYield = Number(v.yieldamount) || 1;
+            const vUnitCost = vYield > 0 ? (vCost / vYield) : vCost;
+
+            html += `
+              <tr class="recipe-variant-row">
+                <td>
+                  <div style="display:flex; align-items:center; padding-left: 56px;">
+                    <span class="variant-branch-line">└─</span>
+                    <span class="variant-egg-badge">🥚 ${escapeHtml(v.parsed.variantLabel)}</span>
+                    <span style="font-size:13px; color:#475569; margin-left: 8px;">${escapeHtml(v.name)}</span>
+                  </div>
+                </td>
+                <td>${vYield} ${escapeHtml(v.yieldunit || 'un')}</td>
+                <td><strong>${formatBRL(vCost)}</strong></td>
+                <td class="text-green font-bold">${formatBRL(vUnitCost)} / ${escapeHtml(v.yieldunit || 'un')}</td>
+                <td class="text-right" style="white-space: nowrap;">
+                  <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openKitchenModeModal(${v.id})" title="Abrir no Modo Cozinha" style="border-color:#ec4899; color:#be185d; font-weight:700;">📖 Cozinhar</button>
+                  <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openProductionFromRecipe(${v.id})" title="Registrar produção desta proporção">+ Produzir</button>
+                  <button class="btn-icon" title="Editar Receita" onclick="event.stopPropagation(); openEditRecipeModal(${v.id})">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button class="btn-icon delete" title="Excluir Receita" onclick="event.stopPropagation(); deleteRecipe(${v.id}, '${escapeHtml(v.name)}')">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  </button>
+                </td>
+              </tr>
+            `;
+          });
+        }
+      });
+
+      // Renderizar receitas avulsas da categoria
+      standalones.forEach(rec => {
+        const totalCost = getRecipeTotalCost(rec);
+        const yieldAmt = Number(rec.yieldamount) || 1;
+        const unitCost = yieldAmt > 0 ? (totalCost / yieldAmt) : totalCost;
+        const icon = getRecipeIcon(rec.name, cat);
 
         html += `
           <tr class="recipe-variant-row">
             <td>
-              <div style="display:flex; align-items:center; padding-left: 36px;">
-                <span class="variant-branch-line">└─</span>
-                <span class="variant-egg-badge">🥚 ${escapeHtml(v.parsed.variantLabel)}</span>
-                <span style="font-size:13px; color:#475569; margin-left: 8px;">${escapeHtml(v.name)}</span>
+              <div style="display:flex; align-items:center; gap:10px; padding-left: 28px;">
+                <span class="recipe-single-icon" style="font-size: 18px;">${icon}</span>
+                <div>
+                  <strong style="font-size: 14px;">${escapeHtml(rec.name)}</strong>
+                </div>
               </div>
             </td>
-            <td>${vYield} ${escapeHtml(v.yieldunit || 'un')}</td>
-            <td><strong>${formatBRL(vCost)}</strong></td>
-            <td class="text-green font-bold">${formatBRL(vUnitCost)} / ${escapeHtml(v.yieldunit || 'un')}</td>
+            <td>${yieldAmt} ${escapeHtml(rec.yieldunit || 'un')}</td>
+            <td><strong>${formatBRL(totalCost)}</strong></td>
+            <td class="text-green font-bold">${formatBRL(unitCost)} / ${escapeHtml(rec.yieldunit || 'un')}</td>
             <td class="text-right" style="white-space: nowrap;">
-              <button class="btn btn-sm btn-secondary" onclick="openKitchenModeModal(${v.id})" title="Abrir no Modo Cozinha" style="border-color:#ec4899; color:#be185d; font-weight:700;">📖 Cozinhar</button>
-              <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${v.id})" title="Registrar produção desta proporção">+ Produzir</button>
-              <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${v.id})">
+              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openKitchenModeModal(${rec.id})" title="Abrir no Modo Cozinha" style="border-color:#ec4899; color:#be185d; font-weight:700;">📖 Cozinhar</button>
+              <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); openProductionFromRecipe(${rec.id})" title="Registrar produção">+ Produzir</button>
+              <button class="btn-icon" title="Editar Receita" onclick="event.stopPropagation(); openEditRecipeModal(${rec.id})">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
-              <button class="btn-icon delete" title="Excluir Receita" onclick="deleteRecipe(${v.id}, '${escapeHtml(v.name)}')">
+              <button class="btn-icon delete" title="Excluir Receita" onclick="event.stopPropagation(); deleteRecipe(${rec.id}, '${escapeHtml(rec.name)}')">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
               </button>
             </td>
@@ -770,42 +868,6 @@ function renderRecipesTable(list) {
         `;
       });
     }
-  });
-
-  // 2. Renderiza Receitas Individuais (Recheios, Brigadeiros, Geléias, etc.)
-  standalones.forEach(rec => {
-    const totalCost = getRecipeTotalCost(rec);
-    const yieldAmt = Number(rec.yieldamount) || 1;
-    const unitCost = yieldAmt > 0 ? (totalCost / yieldAmt) : totalCost;
-    const cat = getRecipeCategory(rec.name);
-    const icon = getRecipeIcon(rec.name, cat);
-
-    html += `
-      <tr>
-        <td>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span class="recipe-single-icon">${icon}</span>
-            <div>
-              <strong>${escapeHtml(rec.name)}</strong>
-              <div><span class="stat-badge blue" style="font-size:11px;">${cat}</span></div>
-            </div>
-          </div>
-        </td>
-        <td>${yieldAmt} ${escapeHtml(rec.yieldunit || 'un')}</td>
-        <td><strong>${formatBRL(totalCost)}</strong></td>
-        <td class="text-green font-bold">${formatBRL(unitCost)} / ${escapeHtml(rec.yieldunit || 'un')}</td>
-        <td class="text-right" style="white-space: nowrap;">
-          <button class="btn btn-sm btn-secondary" onclick="openKitchenModeModal(${rec.id})" title="Abrir no Modo Cozinha" style="border-color:#ec4899; color:#be185d; font-weight:700;">📖 Cozinhar</button>
-          <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${rec.id})" title="Registrar produção">+ Produzir</button>
-          <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${rec.id})">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          <button class="btn-icon delete" title="Excluir Receita" onclick="deleteRecipe(${rec.id}, '${escapeHtml(rec.name)}')">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-          </button>
-        </td>
-      </tr>
-    `;
   });
 
   tbody.innerHTML = html;
@@ -820,7 +882,7 @@ function filterRecipes() {
     const parsed = parseRecipeName(r.name);
     const familyMatch = parsed.familyName.toLowerCase().includes(q);
     const variantMatch = parsed.variantLabel ? parsed.variantLabel.toLowerCase().includes(q) : false;
-    const cat = getRecipeCategory(r.name);
+    const cat = getRecipeCategory(r);
     const categoryMatch = selectedCat === 'all' || cat.toLowerCase().startsWith(selectedCat.toLowerCase().trim());
 
     return (nameMatch || familyMatch || variantMatch) && categoryMatch;
@@ -1039,19 +1101,38 @@ let checkedKitchenIngredients = new Set();
 let checkedKitchenSteps = new Set();
 
 function openKitchenModeModal(recipeId) {
-  const select = document.getElementById('kitchenRecipeSelect');
-  if (select) {
-    select.innerHTML = recipesList.map(r => {
-      const cat = getRecipeCategory(r.name);
-      return `<option value="${r.id}" ${r.id === recipeId ? 'selected' : ''}>${getRecipeIcon(r.name, cat)} ${escapeHtml(r.name)} (${cat})</option>`;
-    }).join('');
-  }
-
   const targetId = recipeId || (recipesList.length > 0 ? recipesList[0].id : null);
   activeKitchenRecipe = recipesList.find(r => r.id === targetId) || recipesList[0] || null;
   kitchenMultiplier = 1.0;
   checkedKitchenIngredients.clear();
   checkedKitchenSteps.clear();
+
+  const select = document.getElementById('kitchenRecipeSelect');
+  if (select) {
+    const byCat = {};
+    recipesList.forEach(r => {
+      const cat = getRecipeCategory(r);
+      if (!byCat[cat]) byCat[cat] = [];
+      byCat[cat].push(r);
+    });
+
+    const sortedCats = Object.keys(byCat).sort((a, b) => {
+      if (a.toLowerCase() === 'massas') return -1;
+      if (b.toLowerCase() === 'massas') return 1;
+      return a.localeCompare(b);
+    });
+
+    let html = '';
+    sortedCats.forEach(cat => {
+      const recs = byCat[cat];
+      html += `<optgroup label="${getRecipeIcon('', cat)} ${cat} (${recs.length})">`;
+      recs.forEach(r => {
+        html += `<option value="${r.id}" ${r.id === targetId ? 'selected' : ''}>${escapeHtml(r.name)}</option>`;
+      });
+      html += `</optgroup>`;
+    });
+    select.innerHTML = html;
+  }
 
   updateKitchenMultiplierButtonsUI();
   renderKitchenMode();
