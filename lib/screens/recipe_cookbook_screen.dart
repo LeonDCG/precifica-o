@@ -34,12 +34,32 @@ class _RecipeCookbookScreenState extends State<RecipeCookbookScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchFilter = '';
 
+  // Estado do Catálogo/Índice do Livro de Receitas
+  final TextEditingController _catalogSearchController = TextEditingController();
+  String _catalogSearchQuery = '';
+  String _catalogCategoryFilter = 'Todas';
+
+  static String _normalizeCategory(String? raw) {
+    if (raw == null) return 'Geral';
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return 'Geral';
+    final lower = trimmed.toLowerCase();
+    if (lower == 'brownie') return 'Brownies';
+    if (lower == 'geleia') return 'Geléias';
+    if (lower == 'chantilly') return 'Chantillys';
+    return trimmed;
+  }
+
+  // Indica se a tela foi aberta no modo catálogo ou se o usuário navegou até o catálogo
+  bool _navigatedToCatalog = false;
+
   @override
   void initState() {
     super.initState();
+    _navigatedToCatalog = widget.initialRecipe == null;
     if (widget.allRecipes != null && widget.allRecipes!.isNotEmpty) {
       _recipes = widget.allRecipes!;
-      _selectedRecipe = widget.initialRecipe ?? _recipes.first;
+      _selectedRecipe = widget.initialRecipe; // Se nulo, abre o Catálogo/Índice do Livro
       _isLoading = false;
     } else {
       _loadRecipes();
@@ -49,6 +69,7 @@ class _RecipeCookbookScreenState extends State<RecipeCookbookScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _catalogSearchController.dispose();
     super.dispose();
   }
 
@@ -62,10 +83,10 @@ class _RecipeCookbookScreenState extends State<RecipeCookbookScreen> {
           if (widget.initialRecipe != null) {
             _selectedRecipe = _recipes.firstWhere(
               (r) => r.id == widget.initialRecipe!.id,
-              orElse: () => _recipes.isNotEmpty ? _recipes.first : widget.initialRecipe!,
+              orElse: () => widget.initialRecipe!,
             );
-          } else if (_recipes.isNotEmpty) {
-            _selectedRecipe = _recipes.first;
+          } else {
+            _selectedRecipe = null; // Abre no Catálogo para o usuário escolher!
           }
           _isLoading = false;
         });
@@ -144,54 +165,375 @@ class _RecipeCookbookScreenState extends State<RecipeCookbookScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121216) : const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Livro de Receitas',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            Text(
-              'Modo Cozinha & Bancada',
-              style: GoogleFonts.inter(fontSize: 11, color: isDark ? Colors.white70 : Colors.white),
-            ),
+    return PopScope(
+      canPop: _selectedRecipe == null || !_navigatedToCatalog,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_selectedRecipe != null) {
+          setState(() => _selectedRecipe = null);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? const Color(0xFF121216) : const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (_selectedRecipe != null && _navigatedToCatalog) {
+                setState(() => _selectedRecipe = null);
+              } else {
+                Navigator.maybePop(context);
+              }
+            },
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _selectedRecipe == null ? 'Livro de Receitas' : _selectedRecipe!.name,
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 17),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                _selectedRecipe == null ? 'Escolha uma receita para a bancada' : 'Modo Cozinha & Bancada',
+                style: GoogleFonts.inter(fontSize: 11, color: isDark ? Colors.white70 : Colors.white),
+              ),
+            ],
+          ),
+          actions: [
+            if (_selectedRecipe != null) ...[
+              // Botão para voltar ao índice do livro
+              IconButton(
+                icon: const Icon(Icons.menu_book_rounded),
+                tooltip: 'Índice de Receitas',
+                onPressed: () {
+                  setState(() {
+                    _navigatedToCatalog = true;
+                    _selectedRecipe = null;
+                  });
+                },
+              ),
+              // Botão para resetar checklist
+              IconButton(
+                icon: const Icon(Icons.restart_alt_rounded),
+                tooltip: 'Reiniciar Fornada',
+                onPressed: _resetChecklist,
+              ),
+            ],
           ],
         ),
-        actions: [
-          // Botão para trocar de receita
-          IconButton(
-            icon: const Icon(Icons.menu_book_rounded),
-            tooltip: 'Escolher Outra Receita',
-            onPressed: () => _openRecipePickerModal(isDark),
-          ),
-          // Botão para resetar checklist
-          IconButton(
-            icon: const Icon(Icons.restart_alt_rounded),
-            tooltip: 'Reiniciar Fornada',
-            onPressed: _resetChecklist,
-          ),
-        ],
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _selectedRecipe == null
+                ? _buildRecipeCatalog(isDark)
+                : _buildCookbookBody(isDark),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _selectedRecipe == null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('📖', style: TextStyle(fontSize: 48)),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Nenhuma receita cadastrada',
-                        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+    );
+  }
+
+  /// Catálogo e Índice visual de todas as receitas agrupadas por categoria
+  Widget _buildRecipeCatalog(bool isDark) {
+    final query = _catalogSearchQuery.toLowerCase().trim();
+    final filtered = _recipes.where((r) {
+      final nameMatch = r.name.toLowerCase().contains(query);
+      final cat = _normalizeCategory(r.category);
+      final catMatch = cat.toLowerCase().contains(query);
+      final filterMatch = _catalogCategoryFilter == 'Todas' || cat.toLowerCase() == _catalogCategoryFilter.toLowerCase();
+      return (nameMatch || catMatch) && filterMatch;
+    }).toList();
+
+    final Map<String, List<Recipe>> byCategory = {};
+    for (var r in filtered) {
+      final cat = _normalizeCategory(r.category);
+      byCategory.putIfAbsent(cat, () => []).add(r);
+    }
+
+    final sortedCategories = byCategory.keys.toList()
+      ..sort((a, b) {
+        if (a.toLowerCase() == 'massas') return -1;
+        if (b.toLowerCase() == 'massas') return 1;
+        return a.toLowerCase().compareTo(b.toLowerCase());
+      });
+
+    final allCategories = ['Todas', 'Massas', 'Brigadeiros', 'Recheios', 'Caldas', 'Geléias', 'Chantillys', 'Brownies'];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      children: [
+        // CABEÇALHO DO ÍNDICE
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? [const Color(0xFF26262D), const Color(0xFF1E1E24)]
+                  : [const Color(0xFFFDF2F8), const Color(0xFFFFF1F2)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFEC4899).withOpacity(0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEC4899).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: const Text('📖', style: TextStyle(fontSize: 26)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Índice de Receitas',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF9D174D),
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Escolha uma receita abaixo para abrir os ingredientes e a bancada de preparo',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: isDark ? Colors.white70 : const Color(0xFFBE185D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // CAMPO DE BUSCA
+        TextField(
+          controller: _catalogSearchController,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black),
+          decoration: InputDecoration(
+            hintText: 'Buscar receita no livro...',
+            hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _catalogSearchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    onPressed: () {
+                      _catalogSearchController.clear();
+                      setState(() => _catalogSearchQuery = '');
+                    },
+                  )
+                : null,
+            filled: true,
+            fillColor: isDark ? const Color(0xFF1E1E24) : Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade300),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          ),
+          onChanged: (v) {
+            setState(() => _catalogSearchQuery = v);
+          },
+        ),
+
+        const SizedBox(height: 12),
+
+        // FILTROS DE CATEGORIA (CHIPS)
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: allCategories.map((cat) {
+              final isSelected = _catalogCategoryFilter.toLowerCase() == cat.toLowerCase();
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: FilterChip(
+                  label: Text(cat),
+                  selected: isSelected,
+                  selectedColor: const Color(0xFFEC4899),
+                  checkmarkColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    fontSize: 12.5,
                   ),
-                )
-              : _buildCookbookBody(isDark),
+                  backgroundColor: isDark ? const Color(0xFF1E1E24) : Colors.white,
+                  side: BorderSide(
+                    color: isSelected
+                        ? const Color(0xFFEC4899)
+                        : (isDark ? Colors.white12 : Colors.grey.shade300),
+                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  onSelected: (_) {
+                    setState(() => _catalogCategoryFilter = cat);
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // LISTA DE CATEGORIAS E RECEITAS
+        if (filtered.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Column(
+                children: [
+                  const Text('🔍', style: TextStyle(fontSize: 40)),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Nenhuma receita encontrada para a busca.',
+                    style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...sortedCategories.map((cat) {
+            final recs = byCategory[cat]!;
+            final catIcon = _getCategoryIcon(cat);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Título da Categoria
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 6.0),
+                    child: Row(
+                      children: [
+                        Text(catIcon, style: const TextStyle(fontSize: 20)),
+                        const SizedBox(width: 8),
+                        Text(
+                          cat,
+                          style: GoogleFonts.outfit(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEC4899).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${recs.length} receita${recs.length > 1 ? 's' : ''}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFEC4899),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Cards das Receitas desta categoria
+                  ...recs.map((recipe) {
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      elevation: 0.5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isDark ? Colors.white12 : Colors.grey.shade200,
+                        ),
+                      ),
+                      color: isDark ? const Color(0xFF1E1E24) : Colors.white,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _selectRecipe(recipe),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEC4899).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(catIcon, style: const TextStyle(fontSize: 22)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      recipe.name,
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${recipe.ingredients.length} ingredientes • Rende: ${recipe.yieldAmount.toStringAsFixed(0)} ${recipe.yieldUnit}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? Colors.white60 : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFEC4899),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  minimumSize: const Size(0, 32),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _selectRecipe(recipe),
+                                icon: const Icon(Icons.soup_kitchen_rounded, size: 14),
+                                label: const Text(
+                                  'Cozinhar',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          }),
+      ],
     );
   }
 

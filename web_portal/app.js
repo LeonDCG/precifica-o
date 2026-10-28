@@ -1101,8 +1101,8 @@ let checkedKitchenIngredients = new Set();
 let checkedKitchenSteps = new Set();
 
 function openKitchenModeModal(recipeId) {
-  const targetId = recipeId || (recipesList.length > 0 ? recipesList[0].id : null);
-  activeKitchenRecipe = recipesList.find(r => r.id === targetId) || recipesList[0] || null;
+  const targetId = recipeId || null;
+  activeKitchenRecipe = targetId ? (recipesList.find(r => r.id === targetId) || null) : null;
   kitchenMultiplier = 1.0;
   checkedKitchenIngredients.clear();
   checkedKitchenSteps.clear();
@@ -1123,11 +1123,14 @@ function openKitchenModeModal(recipeId) {
     });
 
     let html = '';
+    if (!targetId) {
+      html += `<option value="" selected disabled>📖 Escolha uma receita para começar o preparo...</option>`;
+    }
     sortedCats.forEach(cat => {
       const recs = byCat[cat];
       html += `<optgroup label="${getRecipeIcon('', cat)} ${cat} (${recs.length})">`;
       recs.forEach(r => {
-        html += `<option value="${r.id}" ${r.id === targetId ? 'selected' : ''}>${escapeHtml(r.name)}</option>`;
+        html += `<option value="${r.id}" ${targetId && r.id === targetId ? 'selected' : ''}>${escapeHtml(r.name)}</option>`;
       });
       html += `</optgroup>`;
     });
@@ -1198,9 +1201,35 @@ function resetKitchenChecklist() {
 function renderKitchenMode() {
   if (!activeKitchenRecipe) {
     const headerCard = document.getElementById('kitchenRecipeHeaderCard');
-    if (headerCard) headerCard.innerHTML = '<div class="text-muted">Nenhuma receita selecionada.</div>';
+    if (headerCard) {
+      headerCard.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 14px; padding: 6px 0;">
+          <div style="width: 52px; height: 52px; border-radius: 12px; background: #fff5f7; border: 1px dashed #f472b6; display: flex; align-items: center; justify-content: center; font-size: 26px;">
+            📖
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: #1e293b;">Selecione uma Receita no Topo</h3>
+            <p style="margin: 3px 0 0; font-size: 13px; color: #64748b;">Escolha a receita desejada no seletor acima para abrir os ingredientes calculados e o checklist da bancada.</p>
+          </div>
+        </div>
+      `;
+    }
     const ingList = document.getElementById('kitchenIngredientsList');
-    if (ingList) ingList.innerHTML = '';
+    if (ingList) {
+      ingList.innerHTML = `
+        <div style="text-align: center; padding: 36px 20px; color: #94a3b8;">
+          <div style="font-size: 38px; margin-bottom: 10px;">👩‍🍳</div>
+          <div style="font-size: 15px; font-weight: 700; color: #475569;">Bancada aguardando seleção</div>
+          <div style="font-size: 13px; margin-top: 4px; color: #64748b;">Selecione uma receita na lista suspensa acima para carregar as quantidades e proporções.</div>
+        </div>
+      `;
+    }
+    const progressText = document.getElementById('kitchenProgressText');
+    if (progressText) progressText.textContent = '0%';
+    const progressBar = document.getElementById('kitchenProgressBar');
+    if (progressBar) progressBar.style.width = '0%';
+    const instrList = document.getElementById('kitchenInstructionsList');
+    if (instrList) instrList.innerHTML = '<div style="color: #94a3b8; font-size: 13px; font-style: italic; padding: 12px 0;">Nenhuma receita selecionada.</div>';
     return;
   }
 
