@@ -17,6 +17,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'admin_orders_panel_screen.dart';
 import 'admin_sellers_screen.dart';
 import 'simple_cakes_screen.dart';
+import 'recipe_cookbook_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -590,6 +591,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Icons.cake_outlined,
                         const Color(0xFFEC4899),
                         const SimpleCakesScreen(),
+                      ),
+                      _buildQuickActionCard(
+                        context,
+                        'Livro de Receitas',
+                        Icons.menu_book_rounded,
+                        const Color(0xFFF59E0B),
+                        const RecipeCookbookScreen(),
                       ),
                       _buildQuickActionCard(
                         context,

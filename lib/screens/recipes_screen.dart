@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../database/db_helper.dart';
 import '../models/recipe.dart';
 import 'add_recipe_screen.dart';
+import 'recipe_cookbook_screen.dart';
 
 /// Modelo de análise para identificação de famílias e variações de receitas
 class ParsedRecipeInfo {
@@ -330,6 +331,18 @@ class _RecipesScreenState extends State<RecipesScreen> {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.menu_book_rounded),
+            tooltip: 'Livro de Receitas (Modo Cozinha)',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RecipeCookbookScreen(allRecipes: _recipes),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Atualizar receitas',
             onPressed: () => _refreshRecipes(force: true),
@@ -650,6 +663,45 @@ class _RecipesScreenState extends State<RecipesScreen> {
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Botão Modo Cozinha (Cozinhar)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RecipeCookbookScreen(
+                            initialRecipe: recipe,
+                            allRecipes: _recipes,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEC4899).withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFEC4899).withOpacity(0.4)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.soup_kitchen_rounded, color: Color(0xFFEC4899), size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'Cozinhar',
+                            style: TextStyle(
+                              color: Color(0xFFEC4899),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   // Botão de Excluir Compacto

@@ -653,6 +653,7 @@ function renderRecipesTable(list) {
           <td><strong>${formatBRL(totalCost)}</strong></td>
           <td class="text-green font-bold">${formatBRL(unitCost)} / ${escapeHtml(rec.yieldunit || 'un')}</td>
           <td class="text-right" style="white-space: nowrap;">
+            <button class="btn btn-sm btn-secondary" onclick="openKitchenModeModal(${rec.id})" title="Abrir no Modo Cozinha" style="border-color:#ec4899; color:#be185d; font-weight:700;">📖 Cozinhar</button>
             <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${rec.id})" title="Registrar produção desta receita">+ Produzir</button>
             <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${rec.id})">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -756,6 +757,7 @@ function renderRecipesTable(list) {
             <td><strong>${formatBRL(vCost)}</strong></td>
             <td class="text-green font-bold">${formatBRL(vUnitCost)} / ${escapeHtml(v.yieldunit || 'un')}</td>
             <td class="text-right" style="white-space: nowrap;">
+              <button class="btn btn-sm btn-secondary" onclick="openKitchenModeModal(${v.id})" title="Abrir no Modo Cozinha" style="border-color:#ec4899; color:#be185d; font-weight:700;">📖 Cozinhar</button>
               <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${v.id})" title="Registrar produção desta proporção">+ Produzir</button>
               <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${v.id})">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -793,6 +795,7 @@ function renderRecipesTable(list) {
         <td><strong>${formatBRL(totalCost)}</strong></td>
         <td class="text-green font-bold">${formatBRL(unitCost)} / ${escapeHtml(rec.yieldunit || 'un')}</td>
         <td class="text-right" style="white-space: nowrap;">
+          <button class="btn btn-sm btn-secondary" onclick="openKitchenModeModal(${rec.id})" title="Abrir no Modo Cozinha" style="border-color:#ec4899; color:#be185d; font-weight:700;">📖 Cozinhar</button>
           <button class="btn btn-sm btn-secondary" onclick="openProductionFromRecipe(${rec.id})" title="Registrar produção">+ Produzir</button>
           <button class="btn-icon" title="Editar Receita" onclick="openEditRecipeModal(${rec.id})">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1025,6 +1028,307 @@ async function deleteRecipe(recipeId, recipeName) {
     console.error('Erro ao excluir receita:', err);
     showToast('Erro ao excluir receita.', 'error');
   }
+}
+
+// ==========================================
+// 3.1 LIVRO DE RECEITAS & MODO COZINHA (CHECKLIST & BANCADA)
+// ==========================================
+let activeKitchenRecipe = null;
+let kitchenMultiplier = 1.0;
+let checkedKitchenIngredients = new Set();
+let checkedKitchenSteps = new Set();
+
+function openKitchenModeModal(recipeId) {
+  const select = document.getElementById('kitchenRecipeSelect');
+  if (select) {
+    select.innerHTML = recipesList.map(r => {
+      const cat = getRecipeCategory(r.name);
+      return `<option value="${r.id}" ${r.id === recipeId ? 'selected' : ''}>${getRecipeIcon(r.name, cat)} ${escapeHtml(r.name)} (${cat})</option>`;
+    }).join('');
+  }
+
+  const targetId = recipeId || (recipesList.length > 0 ? recipesList[0].id : null);
+  activeKitchenRecipe = recipesList.find(r => r.id === targetId) || recipesList[0] || null;
+  kitchenMultiplier = 1.0;
+  checkedKitchenIngredients.clear();
+  checkedKitchenSteps.clear();
+
+  updateKitchenMultiplierButtonsUI();
+  renderKitchenMode();
+  openModal('kitchenModeModal');
+}
+
+function onKitchenRecipeSelectChange() {
+  const select = document.getElementById('kitchenRecipeSelect');
+  if (!select) return;
+  const id = Number(select.value);
+  activeKitchenRecipe = recipesList.find(r => r.id === id) || null;
+  kitchenMultiplier = 1.0;
+  checkedKitchenIngredients.clear();
+  checkedKitchenSteps.clear();
+
+  updateKitchenMultiplierButtonsUI();
+  renderKitchenMode();
+}
+
+function setKitchenMultiplier(factor) {
+  kitchenMultiplier = Number(factor) || 1.0;
+  updateKitchenMultiplierButtonsUI();
+  renderKitchenMode();
+}
+
+function updateKitchenMultiplierButtonsUI() {
+  document.querySelectorAll('.btn-multiplier').forEach(btn => {
+    const factor = Number(btn.getAttribute('data-factor'));
+    if (factor === kitchenMultiplier) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+function toggleKitchenIngredient(idx) {
+  if (checkedKitchenIngredients.has(idx)) {
+    checkedKitchenIngredients.delete(idx);
+  } else {
+    checkedKitchenIngredients.add(idx);
+  }
+  renderKitchenIngredientsAndProgress();
+}
+
+function toggleKitchenStep(idx) {
+  if (checkedKitchenSteps.has(idx)) {
+    checkedKitchenSteps.delete(idx);
+  } else {
+    checkedKitchenSteps.add(idx);
+  }
+  renderKitchenInstructions();
+}
+
+function resetKitchenChecklist() {
+  checkedKitchenIngredients.clear();
+  checkedKitchenSteps.clear();
+  renderKitchenIngredientsAndProgress();
+  renderKitchenInstructions();
+  showToast('Checklist reiniciado! Pronta para nova fornada.', 'success');
+}
+
+function renderKitchenMode() {
+  if (!activeKitchenRecipe) {
+    const headerCard = document.getElementById('kitchenRecipeHeaderCard');
+    if (headerCard) headerCard.innerHTML = '<div class="text-muted">Nenhuma receita selecionada.</div>';
+    const ingList = document.getElementById('kitchenIngredientsList');
+    if (ingList) ingList.innerHTML = '';
+    return;
+  }
+
+  const rec = activeKitchenRecipe;
+  const cat = getRecipeCategory(rec.name);
+  const icon = getRecipeIcon(rec.name, cat);
+  const baseYield = Number(rec.yieldamount) || 1;
+  const scaledYield = baseYield * kitchenMultiplier;
+  const yieldStr = Number.isInteger(scaledYield) ? scaledYield : scaledYield.toFixed(1);
+
+  // Renderiza Card de cabeçalho
+  const headerCard = document.getElementById('kitchenRecipeHeaderCard');
+  if (headerCard) {
+    headerCard.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 52px; height: 52px; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+          ${icon}
+        </div>
+        <div>
+          <h3 style="margin: 0; font-size: 19px; font-weight: 800; color: #0f172a;">${escapeHtml(rec.name)}</h3>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+            <span class="stat-badge blue" style="font-size: 11px;">${cat}</span>
+            <span style="font-size: 12px; color: #64748b;">⏱️ ${rec.preptimeminutes ? rec.preptimeminutes + ' min' : 'Preparo rápido'}</span>
+          </div>
+        </div>
+      </div>
+      <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 10px; padding: 10px 14px; text-align: right;">
+        <span style="font-size: 11px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">Rendimento Previsto</span>
+        <div style="font-size: 16px; font-weight: 800; color: #b45309;">🥧 ${yieldStr} ${escapeHtml(rec.yieldunit || 'unidades')}</div>
+      </div>
+    `;
+  }
+
+  renderKitchenIngredientsAndProgress();
+  renderKitchenInstructions();
+}
+
+function renderKitchenIngredientsAndProgress() {
+  if (!activeKitchenRecipe) return;
+  const rec = activeKitchenRecipe;
+  const items = recipeIngredientsList.filter(ri => (ri.recipeid || ri.recipeId) === rec.id);
+
+  const container = document.getElementById('kitchenIngredientsList');
+  const progressText = document.getElementById('kitchenProgressText');
+  const progressBar = document.getElementById('kitchenProgressBar');
+
+  const total = items.length;
+  const checked = checkedKitchenIngredients.size;
+  const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+
+  if (progressText) {
+    progressText.textContent = `${checked} de ${total} (${pct}%)`;
+    progressText.style.color = checked === total && total > 0 ? '#10b981' : '#ec4899';
+  }
+  if (progressBar) {
+    progressBar.style.width = `${pct}%`;
+  }
+
+  if (!container) return;
+
+  if (items.length === 0) {
+    container.innerHTML = '<div style="padding: 16px; text-align: center; color: #94a3b8; background: #f8fafc; border-radius: 10px;">Nenhum ingrediente vinculado a esta receita.</div>';
+    return;
+  }
+
+  container.innerHTML = items.map((item, idx) => {
+    const isChecked = checkedKitchenIngredients.has(idx);
+    const ing = ingredientsList.find(i => i.id === (item.ingredientid || item.ingredientId));
+    const name = ing ? ing.name : (item.ingredientname || 'Ingrediente');
+    const unit = ing ? ing.unit : (item.ingredientunit || 'un');
+    const baseQty = Number(item.quantityused) || 0;
+    const scaledQty = baseQty * kitchenMultiplier;
+    const qtyFormatted = Number.isInteger(scaledQty) ? scaledQty : scaledQty.toFixed(1).replace('.', ',');
+
+    return `
+      <div onclick="toggleKitchenIngredient(${idx})" class="kitchen-ingredient-card ${isChecked ? 'checked' : ''}">
+        <input type="checkbox" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleKitchenIngredient(${idx})" style="width: 20px; height: 20px; accent-color: #10b981; cursor: pointer;">
+        <div style="background: ${isChecked ? '#d1fae5' : '#f1f5f9'}; border-radius: 8px; padding: 6px 12px; font-weight: 800; font-size: 15px; color: ${isChecked ? '#065f46' : '#0f172a'}; min-width: 80px; text-align: center;">
+          ${qtyFormatted} ${escapeHtml(unit)}
+        </div>
+        <div class="kitchen-ingredient-name" style="flex: 1; font-weight: ${isChecked ? '500' : '700'}; font-size: 15px; color: ${isChecked ? '#64748b' : '#1e293b'};">
+          ${escapeHtml(name)}
+        </div>
+        ${isChecked ? '<span style="color: #10b981; font-weight: 800; font-size: 13px;">✓ Adicionado</span>' : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderKitchenInstructions() {
+  if (!activeKitchenRecipe) return;
+  const section = document.getElementById('kitchenInstructionsSection');
+  const container = document.getElementById('kitchenInstructionsList');
+  if (!section || !container) return;
+
+  const raw = (activeKitchenRecipe.instructions || '').trim();
+  if (!raw) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+
+  container.innerHTML = lines.map((line, idx) => {
+    const isDone = checkedKitchenSteps.has(idx);
+    const cleanStep = line.replace(/^(\d+[\.\-\)]|\bPasso\s*\d+:?)\s*/i, '');
+
+    return `
+      <div onclick="toggleKitchenStep(${idx})" class="kitchen-step-card ${isDone ? 'done' : ''}">
+        <div style="width: 24px; height: 24px; border-radius: 50%; background: ${isDone ? '#10b981' : '#fce7f3'}; color: ${isDone ? '#fff' : '#be185d'}; font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">
+          ${isDone ? '✓' : (idx + 1)}
+        </div>
+        <div class="kitchen-step-text" style="flex: 1; font-size: 14px; line-height: 1.45; color: ${isDone ? '#64748b' : '#334155'};">
+          ${escapeHtml(cleanStep || line)}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function printKitchenRecipe() {
+  if (!activeKitchenRecipe) return;
+  const rec = activeKitchenRecipe;
+  const cat = getRecipeCategory(rec.name);
+  const items = recipeIngredientsList.filter(ri => (ri.recipeid || ri.recipeId) === rec.id);
+  const baseYield = Number(rec.yieldamount) || 1;
+  const scaledYield = baseYield * kitchenMultiplier;
+  const yieldStr = Number.isInteger(scaledYield) ? scaledYield : scaledYield.toFixed(1);
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Permita popups para imprimir a ficha da receita.');
+    return;
+  }
+
+  const itemsHtml = items.map(item => {
+    const ing = ingredientsList.find(i => i.id === (item.ingredientid || item.ingredientId));
+    const name = ing ? ing.name : (item.ingredientname || 'Ingrediente');
+    const unit = ing ? ing.unit : (item.ingredientunit || 'un');
+    const baseQty = Number(item.quantityused) || 0;
+    const scaledQty = baseQty * kitchenMultiplier;
+    const qtyFormatted = Number.isInteger(scaledQty) ? scaledQty : scaledQty.toFixed(1).replace('.', ',');
+    return `
+      <tr style="border-bottom: 1px solid #ddd;">
+        <td style="padding: 8px; width: 40px; text-align: center;"><input type="checkbox" style="width:16px; height:16px;"></td>
+        <td style="padding: 8px; font-weight: bold; font-size: 16px; width: 120px;">${qtyFormatted} ${unit}</td>
+        <td style="padding: 8px; font-size: 15px;">${escapeHtml(name)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const stepsHtml = (rec.instructions || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map((s, i) => `
+    <li style="margin-bottom: 8px; font-size: 14px; line-height: 1.5;">${escapeHtml(s.replace(/^(\d+[\.\-\)]|\bPasso\s*\d+:?)\s*/i, ''))}</li>
+  `).join('');
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Ficha de Preparo - ${escapeHtml(rec.name)}</title>
+      <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #111; max-width: 800px; margin: 0 auto; }
+        h1 { margin: 0 0 4px 0; font-size: 24px; }
+        .meta { color: #555; margin-bottom: 20px; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+        th { text-align: left; padding: 8px; border-bottom: 2px solid #333; background: #f4f4f4; }
+        .badge { display: inline-block; padding: 4px 8px; background: #eee; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        @media print { body { padding: 0; } }
+      </style>
+    </head>
+    <body>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #ec4899; padding-bottom:12px; margin-bottom:16px;">
+        <div>
+          <h1>🍰 ${escapeHtml(rec.name)}</h1>
+          <div class="meta">${escapeHtml(cat)} • Tempo: ${rec.preptimeminutes || 0} min</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="badge">Fornada: ${kitchenMultiplier}x</div>
+          <div style="font-size:16px; font-weight:bold; margin-top:4px;">Rendimento: ${yieldStr} ${escapeHtml(rec.yieldunit || 'un')}</div>
+        </div>
+      </div>
+
+      <h3>Ingredientes Necessários:</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>✓</th>
+            <th>Quantidade</th>
+            <th>Ingrediente</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+
+      ${stepsHtml ? `<h3>Modo de Preparo:</h3><ol style="padding-left: 20px;">${stepsHtml}</ol>` : ''}
+
+      <div style="margin-top: 30px; font-size: 11px; color: #888; text-align: center; border-top: 1px solid #ddd; padding-top: 10px;">
+        Doce & Ponto - Ficha de Produção • Impresso em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
+      </div>
+      <script>
+        window.onload = function() { window.print(); };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 // ==========================================
