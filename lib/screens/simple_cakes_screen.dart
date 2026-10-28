@@ -15,7 +15,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
   String _searchQuery = '';
   List<SimpleCake> _cakes = [];
   bool _isLoading = true;
-  bool _isGridView = true; // Alterna entre Cards (Grid) e Lista
+  bool _isGridView = false; // Padrão: Lista de Balcão (ultra legível e rápida)
 
   @override
   void initState() {
@@ -60,7 +60,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
     return _cakes.where((c) => c.name.toLowerCase().contains(q)).toList();
   }
 
-  /// Mapeamento de Emojis idêntico ao padrão oficial da loja
+  /// Mapeamento de Emojis idêntico ao catálogo oficial da loja
   String _getCakeEmoji(String name) {
     final n = name.toLowerCase().trim();
     if (n.contains('brownie')) return '⚡';
@@ -101,7 +101,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
       return;
     }
 
-    // 1. Atualização Otimista Imediata
+    // 1. Atualização Otimista Imediata na UI
     setState(() {
       final idx = _cakes.indexWhere((c) => c.id == cake.id);
       if (idx != -1) {
@@ -129,10 +129,12 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
 
   /// Toque para digitar quantidade exata
   Future<void> _promptExactQty(SimpleCake cake) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final controller = TextEditingController(text: cake.quantity.toString());
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E24) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -141,7 +143,11 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
             Expanded(
               child: Text(
                 cake.name,
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
               ),
             ),
           ],
@@ -152,7 +158,10 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
           children: [
             Text(
               'Digite a quantidade em balcão:',
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.grey.shade700,
+                fontSize: 13,
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -160,12 +169,17 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
               keyboardType: TextInputType.number,
               autofocus: true,
               textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
               decoration: InputDecoration(
                 suffixText: 'unidades',
+                suffixStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
-                fillColor: Colors.grey.shade50,
+                fillColor: isDark ? const Color(0xFF26262D) : Colors.grey.shade50,
               ),
             ),
           ],
@@ -173,7 +187,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text('Cancelar', style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade700)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -201,6 +215,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
 
   /// Cadastro / Edição SUPER SIMPLES: Apenas Nome e Quantidade
   Future<void> _openSimpleCakeModal({SimpleCake? cake}) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isEditing = cake != null;
     final nameCtrl = TextEditingController(text: cake?.name ?? '');
     final qtyCtrl = TextEditingController(text: cake?.quantity.toString() ?? '1');
@@ -208,13 +223,14 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E24) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.pink.shade50,
+                color: isDark ? Colors.pink.shade900.withValues(alpha: 0.3) : Colors.pink.shade50,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -226,7 +242,11 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
             Expanded(
               child: Text(
                 isEditing ? 'Editar Bolo' : 'Novo Bolo',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
               ),
             ),
           ],
@@ -238,20 +258,30 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
               controller: nameCtrl,
               autofocus: !isEditing,
               textCapitalization: TextCapitalization.words,
+              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
               decoration: InputDecoration(
                 labelText: 'Nome do Bolo *',
+                labelStyle: TextStyle(color: isDark ? Colors.white70 : null),
                 hintText: 'Ex: Cenoura, Brownie, Red Velvet...',
+                hintStyle: TextStyle(color: isDark ? Colors.white38 : null),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF26262D) : Colors.white,
               ),
             ),
             const SizedBox(height: 14),
             TextField(
               controller: qtyCtrl,
               keyboardType: TextInputType.number,
+              style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
               decoration: InputDecoration(
                 labelText: 'Quantidade Inicial',
+                labelStyle: TextStyle(color: isDark ? Colors.white70 : null),
                 suffixText: 'unidades',
+                suffixStyle: TextStyle(color: isDark ? Colors.white60 : null),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF26262D) : Colors.white,
               ),
             ),
           ],
@@ -259,7 +289,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text('Cancelar', style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade700)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -300,15 +330,23 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
 
   /// Excluir bolo
   Future<void> _deleteCake(SimpleCake cake) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Excluir Bolo'),
-        content: Text('Deseja realmente remover o bolo "${cake.name}" do controle de estoque?'),
+        backgroundColor: isDark ? const Color(0xFF1E1E24) : Colors.white,
+        title: Text(
+          'Excluir Bolo',
+          style: TextStyle(color: isDark ? Colors.white : Colors.black),
+        ),
+        content: Text(
+          'Deseja realmente remover o bolo "${cake.name}" do controle de estoque?',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: Text('Cancelar', style: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade700)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
@@ -334,6 +372,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final totalUnits = _cakes.fold<int>(0, (sum, c) => sum + c.quantity);
     final totalTypes = _cakes.length;
     final zeroCount = _cakes.where((c) => c.quantity == 0).length;
@@ -367,7 +406,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
           ],
         ),
         actions: [
-          // Alternar entre visualização em Cards ou Lista
+          // Alternar entre visualização em Lista ou Cards
           IconButton(
             icon: Icon(_isGridView ? Icons.view_list_rounded : Icons.grid_view_rounded),
             tooltip: _isGridView ? 'Ver em Lista' : 'Ver em Cards',
@@ -396,12 +435,14 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: TextField(
                   controller: _searchController,
+                  style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
                   decoration: InputDecoration(
                     hintText: 'Buscar sabor...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade500),
+                    prefixIcon: Icon(Icons.search, size: 20, color: isDark ? Colors.white60 : Colors.grey.shade600),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
+                            icon: Icon(Icons.clear, size: 18, color: isDark ? Colors.white60 : Colors.grey),
                             onPressed: () {
                               _searchController.clear();
                               setState(() => _searchQuery = '');
@@ -409,39 +450,54 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: Theme.of(context).cardColor,
+                    fillColor: isDark ? const Color(0xFF1E1E24) : Colors.white,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
+                      borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade300),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade200),
+                      borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade200),
                     ),
                   ),
                   onChanged: (v) => setState(() => _searchQuery = v),
                 ),
               ),
 
-              // Resumo Minimalista no Topo
+              // Resumo de Topo Elegante e Adaptado ao Tema
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Row(
                   children: [
-                    _buildStatPill('Total', '$totalUnits un', const Color(0xFFFCE7F3), const Color(0xFF9D174D)),
+                    _buildStatPill(
+                      'Total',
+                      '$totalUnits un',
+                      isDark ? const Color(0xFF3F1B2E) : const Color(0xFFFCE7F3),
+                      isDark ? const Color(0xFFF472B6) : const Color(0xFF9D174D),
+                    ),
                     const SizedBox(width: 8),
-                    _buildStatPill('Sabores', '$totalTypes tipos', const Color(0xFFE0E7FF), const Color(0xFF3730A3)),
+                    _buildStatPill(
+                      'Sabores',
+                      '$totalTypes tipos',
+                      isDark ? const Color(0xFF1E2640) : const Color(0xFFE0E7FF),
+                      isDark ? const Color(0xFF818CF8) : const Color(0xFF3730A3),
+                    ),
                     const SizedBox(width: 8),
-                    _buildStatPill('Zerados', '$zeroCount esgotados', const Color(0xFFFEE2E2), const Color(0xFF991B1B)),
+                    _buildStatPill(
+                      'Zerados',
+                      '$zeroCount esgotados',
+                      isDark ? const Color(0xFF3B1818) : const Color(0xFFFEE2E2),
+                      isDark ? const Color(0xFFF87171) : const Color(0xFF991B1B),
+                    ),
                   ],
                 ),
               ),
 
               const Divider(height: 16),
 
-              // Lista / Grid de Bolos Super Simples
+              // Lista / Grid de Bolos com Alto Contraste
               Expanded(
                 child: _isLoading && _cakes.isEmpty
                     ? const Center(child: CircularProgressIndicator())
@@ -454,12 +510,16 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                                 const SizedBox(height: 12),
                                 Text(
                                   'Nenhum bolo encontrado',
-                                  style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : Colors.black87,
+                                  ),
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
+                                Text(
                                   'Cadastre bolos rápidos pelo botão abaixo',
-                                  style: TextStyle(color: Colors.grey),
+                                  style: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
                                 ),
                               ],
                             ),
@@ -467,8 +527,8 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                         : RefreshIndicator(
                             onRefresh: () => _loadCakes(forceRefresh: true),
                             child: _isGridView
-                                ? _buildGridView(displayList)
-                                : _buildListView(displayList),
+                                ? _buildGridView(displayList, isDark)
+                                : _buildListView(displayList, isDark),
                           ),
               ),
             ],
@@ -504,62 +564,261 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
     );
   }
 
-  /// Visão em Cards (Grid 2 colunas) - A visão exata compartilhada pelo usuário
-  Widget _buildGridView(List<SimpleCake> list) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 3 : 2);
-
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 80),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.78, // Proporção confortável para caber Emoji, Nome, Status e Botões
-      ),
+  /// Visão Padrão: Lista de Balcão (Ergonômica, Limpa e com Alto Contraste)
+  Widget _buildListView(List<SimpleCake> list, bool isDark) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 96), // Espaço para não tampar com o FAB
       itemCount: list.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final cake = list[index];
-        return _buildCakeGridCard(cake);
+        final emoji = _getCakeEmoji(cake.name);
+        final isZero = cake.quantity == 0;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E24) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isZero
+                  ? (isDark ? Colors.red.shade900 : Colors.red.shade300)
+                  : (isDark ? Colors.white12 : Colors.grey.shade200),
+              width: isZero ? 1.5 : 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Emoji em destaque
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Text(emoji, style: const TextStyle(fontSize: 24)),
+              ),
+              const SizedBox(width: 12),
+
+              // Nome do Bolo + Badge de Status
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cake.name,
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isZero
+                            ? (isDark ? Colors.red.shade300 : Colors.red.shade700)
+                            : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isZero
+                            ? (isDark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2))
+                            : (isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7)),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        isZero ? '⚠️ ESGOTADO' : '✓ DISPONÍVEL',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3,
+                          color: isZero
+                              ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B))
+                              : (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Menu discreto de opções
+              PopupMenuButton<String>(
+                padding: EdgeInsets.zero,
+                icon: Icon(Icons.more_vert, size: 20, color: isDark ? Colors.white38 : Colors.grey.shade400),
+                onSelected: (val) {
+                  if (val == 'edit') {
+                    _openSimpleCakeModal(cake: cake);
+                  } else if (val == 'delete') {
+                    _deleteCake(cake);
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Renomear'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, color: Colors.red, size: 18),
+                        SizedBox(width: 8),
+                        Text('Excluir', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(width: 4),
+
+              // Botão Menos (-)
+              Material(
+                color: isZero
+                    ? (isDark ? Colors.white10 : Colors.grey.shade100)
+                    : (isDark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2)),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _adjustQty(cake, -1),
+                  child: SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: Icon(
+                      Icons.remove,
+                      color: isZero
+                          ? (isDark ? Colors.white24 : Colors.grey.shade400)
+                          : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Quantidade com Toque para Digitar
+              InkWell(
+                onTap: () => _promptExactQty(cake),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 46),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  child: Column(
+                    children: [
+                      Text(
+                        '${cake.quantity}',
+                        style: GoogleFonts.outfit(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: isZero
+                              ? (isDark ? Colors.red.shade300 : Colors.red.shade700)
+                              : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                        ),
+                      ),
+                      Text(
+                        'un',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white60 : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Botão Mais (+)
+              Material(
+                color: isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _adjustQty(cake, 1),
+                  child: SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: Icon(
+                      Icons.add,
+                      color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A),
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
 
-  /// Card Visual idêntico ao modelo:
-  /// [Emoji]
-  /// Nome do Bolo
-  /// ✓ DISPONÍVEL / ⚠️ ESGOTADO / ZERADO
-  /// X unidades
-  /// [-]  [+]
-  Widget _buildCakeGridCard(SimpleCake cake) {
+  /// Visão alternativa em Grid (Cards Compactos e Proporcionais)
+  Widget _buildGridView(List<SimpleCake> list, bool isDark) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 3 : 2);
+
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 96),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.88, // Proporção mais compacta, sem vazios exagerados
+      ),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        final cake = list[index];
+        return _buildCakeGridCard(cake, isDark);
+      },
+    );
+  }
+
+  /// Card Visual no Grid (com contraste AAA em Dark/Light Mode)
+  Widget _buildCakeGridCard(SimpleCake cake, bool isDark) {
     final emoji = _getCakeEmoji(cake.name);
     final isZero = cake.quantity == 0;
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? const Color(0xFF1E1E24) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isZero ? Colors.red.shade300 : Colors.grey.shade200,
+          color: isZero
+              ? (isDark ? Colors.red.shade900 : Colors.red.shade300)
+              : (isDark ? Colors.white12 : Colors.grey.shade200),
           width: isZero ? 1.5 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Stack(
         children: [
-          // Menu de opções rápidas (Editar / Excluir)
+          // Menu de opções
           Positioned(
-            top: 4,
-            right: 4,
+            top: 2,
+            right: 2,
             child: PopupMenuButton<String>(
               padding: EdgeInsets.zero,
-              icon: Icon(Icons.more_horiz, size: 20, color: Colors.grey.shade500),
+              icon: Icon(Icons.more_horiz, size: 20, color: isDark ? Colors.white38 : Colors.grey.shade400),
               onSelected: (val) {
                 if (val == 'edit') {
                   _openSimpleCakeModal(cake: cake);
@@ -592,21 +851,21 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
             ),
           ),
 
-          // Conteúdo Central: Emoji + Nome + Status + Quantidade + Stepper
+          // Conteúdo: Emoji + Nome + Status + Quantidade + Botões
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Topo: Emoji
                 Text(
                   emoji,
-                  style: const TextStyle(fontSize: 34),
+                  style: const TextStyle(fontSize: 30),
                 ),
 
-                // Nome do Bolo (Destaque limpo)
+                // Nome do Bolo com ALTO CONTRASTE
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Text(
                     cake.name,
                     textAlign: TextAlign.center,
@@ -615,26 +874,32 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: isZero ? Colors.red.shade700 : const Color(0xFF1E293B),
+                      color: isZero
+                          ? (isDark ? Colors.red.shade300 : Colors.red.shade700)
+                          : (isDark ? Colors.white : const Color(0xFF0F172A)),
                     ),
                   ),
                 ),
 
                 // Status Badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: isZero ? const Color(0xFFFEE2E2) : const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(6),
+                    color: isZero
+                        ? (isDark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2))
+                        : (isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7)),
+                    borderRadius: BorderRadius.circular(5),
                   ),
                   child: Text(
-                    isZero ? '⚠️ ESGOTADO / ZERADO' : '✓ DISPONÍVEL',
+                    isZero ? '⚠️ ESGOTADO' : '✓ DISPONÍVEL',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 9.5,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.3,
-                      color: isZero ? const Color(0xFF991B1B) : const Color(0xFF166534),
+                      color: isZero
+                          ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B))
+                          : (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534)),
                     ),
                   ),
                 ),
@@ -644,23 +909,25 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                   onTap: () => _promptExactQty(cake),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     child: Column(
                       children: [
                         Text(
                           '${cake.quantity}',
                           style: GoogleFonts.outfit(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: isZero ? Colors.red.shade700 : const Color(0xFF0F172A),
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: isZero
+                                ? (isDark ? Colors.red.shade300 : Colors.red.shade700)
+                               : (isDark ? Colors.white : const Color(0xFF0F172A)),
                           ),
                         ),
                         Text(
                           cake.quantity == 1 ? 'unidade' : 'unidades',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade600,
+                            color: isDark ? Colors.white60 : Colors.grey.shade600,
                           ),
                         ),
                       ],
@@ -674,7 +941,9 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                   children: [
                     // Botão Menos (-)
                     Material(
-                      color: isZero ? Colors.grey.shade100 : Colors.red.shade50,
+                      color: isZero
+                          ? (isDark ? Colors.white10 : Colors.grey.shade100)
+                          : (isDark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2)),
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(10),
@@ -684,16 +953,18 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                           height: 38,
                           child: Icon(
                             Icons.remove,
-                            color: isZero ? Colors.grey.shade400 : Colors.red.shade700,
+                            color: isZero
+                                ? (isDark ? Colors.white24 : Colors.grey.shade400)
+                                : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
                             size: 22,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     // Botão Mais (+)
                     Material(
-                      color: Colors.green.shade50,
+                      color: isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(10),
@@ -703,7 +974,7 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
                           height: 38,
                           child: Icon(
                             Icons.add,
-                            color: Colors.green.shade800,
+                            color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A),
                             size: 22,
                           ),
                         ),
@@ -716,99 +987,6 @@ class _SimpleCakesScreenState extends State<SimpleCakesScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  /// Visão alternativa em Lista (Linhas simples e compactas)
-  Widget _buildListView(List<SimpleCake> list) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-      itemCount: list.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final cake = list[index];
-        final emoji = _getCakeEmoji(cake.name);
-        final isZero = cake.quantity == 0;
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isZero ? Colors.red.shade200 : Colors.grey.shade200,
-            ),
-          ),
-          child: Row(
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 28)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      cake.name,
-                      style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: isZero ? Colors.red.shade700 : null,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isZero ? '⚠️ ESGOTADO' : '✓ DISPONÍVEL',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: isZero ? Colors.red.shade700 : Colors.green.shade800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Stepper Compacto
-              Material(
-                color: isZero ? Colors.grey.shade100 : Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () => _adjustQty(cake, -1),
-                  child: SizedBox(
-                    width: 36,
-                    height: 36,
-                    child: Icon(Icons.remove, size: 20, color: isZero ? Colors.grey : Colors.red.shade700),
-                  ),
-                ),
-              ),
-              InkWell(
-                onTap: () => _promptExactQty(cake),
-                borderRadius: BorderRadius.circular(6),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  child: Text(
-                    '${cake.quantity}',
-                    style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ),
-              Material(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () => _adjustQty(cake, 1),
-                  child: const SizedBox(
-                    width: 36,
-                    height: 36,
-                    child: Icon(Icons.add, size: 20, color: Colors.green),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
